@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v9.1</title>
+  <title>Smart Scanner v9.2</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -28,6 +28,7 @@
     .product-info { display: flex; align-items: center; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 16px; margin-bottom: 15px; }
     .product-info img { width: 60px; height: 60px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; padding: 4px; }
     .product-info h3 { margin: 0; font-size: 0.95em; }
+    .last-price { color: #10b981; font-weight: bold; font-size: 1.1em; margin-top: 4px; display: block; }
 
     .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 18px; border: 1px solid rgba(16, 185, 129, 0.2); }
     .btn-save { width: 100%; background: #10b981; margin-top: 15px; }
@@ -42,7 +43,7 @@
 <body>
 
   <div class="smart-card">
-    <div class="version-tag">VERSÃO 9.1</div>
+    <div class="version-tag">VERSÃO 9.2</div>
     <h1>Smart Scanner</h1>
     <p class="subtitle">Produtos e Preços na sua Planilha</p>
     
@@ -60,11 +61,12 @@
         <div>
           <h3 id="resNome"></h3>
           <small id="resEan" style="color:#64748b"></small>
+          <span id="resUltimoPreco" class="last-price"></span>
         </div>
       </div>
 
       <div class="price-form">
-        <label>Valor do Produto (R$)</label>
+        <label>Novo Valor (R$)</label>
         <input type="number" id="inputPreco" step="0.01" placeholder="0.00">
         
         <label>Onde você está?</label>
@@ -122,8 +124,19 @@
 
       const { data, error } = await supabaseClient
         .from('produtos')
-        .select('*')
+        .select(`
+          id, 
+          nome, 
+          foto_url, 
+          precos (
+            valor, 
+            data_coleta, 
+            supermercados (nome)
+          )
+        `)
         .or(`id.eq.${termo},nome.ilike.%${termo}%`)
+        .order('data_coleta', { foreignTable: 'precos', ascending: false })
+        .limit(1, { foreignTable: 'precos' })
         .maybeSingle();
 
       if (data) {
@@ -139,6 +152,18 @@
       document.getElementById('resNome').innerText = produto.nome;
       document.getElementById('resEan').innerText = "EAN: " + produto.id;
       document.getElementById('resFoto').src = produto.foto_url || "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E";
+      
+      const ultimoPrecoObj = produto.precos && produto.precos[0];
+      const precoElement = document.getElementById('resUltimoPreco');
+      
+      if (ultimoPrecoObj) {
+        const valor = ultimoPrecoObj.valor;
+        const loja = ultimoPrecoObj.supermercados ? ultimoPrecoObj.supermercados.nome : "Loja n/d";
+        precoElement.innerHTML = `R$ ${valor.toFixed(2)} <small style="font-weight:normal; color:#94a3b8; font-size:0.7em;">(${loja})</small>`;
+      } else {
+        precoElement.innerText = "Sem preço anterior";
+      }
+
       document.getElementById('inputPreco').value = "";
     }
 
@@ -165,8 +190,8 @@
         if (error) throw error;
 
         alert("✅ Preço registrado com sucesso!");
-        document.getElementById('areaResultado').style.display = 'none';
-        document.getElementById('barcodeInput').value = "";
+        // Atualiza a busca para mostrar o novo preço no card imediatamente
+        buscarNoBanco();
       } catch (err) {
         alert("Erro ao salvar: " + err.message);
       } finally {
