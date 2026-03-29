@@ -102,47 +102,90 @@
     const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
     // ==========================================
-    // LÓGICA DE UPLOAD DE FOTO (STORAGE)
-    // ==========================================
-    document.getElementById('fotoInput').addEventListener('change', async function(e) {
-      const arquivo = e.target.files[0];
-      if (!arquivo) return;
+// LÓGICA DE COMPRESSÃO E UPLOAD (STORAGE)
+// ==========================================
+document.getElementById('fotoInput').addEventListener('change', async function(e) {
+  const arquivoOriginal = e.target.files[0];
+  if (!arquivoOriginal) return;
 
-      const status = document.getElementById('statusUpload');
-      const preview = document.getElementById('previewFoto');
+  const status = document.getElementById('statusUpload');
+  const preview = document.getElementById('previewFoto');
+  status.innerText = "⏳ Processando imagem...";
 
-      // 1. Mostrar preview local imediatamente
-      preview.src = URL.createObjectURL(arquivo);
+  // --- INÍCIO DA COMPRESSÃO ---
+  const lerArquivo = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.readAsDataURL(file);
+  });
+
+  const imgData = await lerArquivo(arquivoOriginal);
+  const img = new Image();
+  img.src = imgData;
+
+  img.onload = async function() {
+    const canvas = document.createElement('canvas');
+    const MAX_WIDTH = 800;
+    const MAX_HEIGHT = 800;
+    let width = img.width;
+    let height = img.height;
+
+    // Calcula as novas dimensões mantendo a proporção
+    if (width > height) {
+      if (width > MAX_WIDTH) {
+        height *= MAX_WIDTH / width;
+        width = MAX_WIDTH;
+      }
+    } else {
+      if (height > MAX_HEIGHT) {
+        width *= MAX_HEIGHT / height;
+        height = MAX_HEIGHT;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Converte para Blob (JPEG com 0.7 de qualidade)
+    canvas.toBlob(async (blob) => {
+      // Exibir preview da imagem já comprimida
+      preview.src = URL.createObjectURL(blob);
       preview.style.display = 'block';
-      status.innerText = "⏳ Enviando...";
-
-      // 2. Nome do arquivo único usando a data atual
-      const nomeArquivo = `teste_${Date.now()}.jpg`;
+      
+      const nomeArquivo = `prod_${Date.now()}.jpg`;
+      status.innerText = `⏳ Enviando... (${(blob.size / 1024).toFixed(1)} KB)`;
 
       try {
-        // 3. Upload para o bucket 'fotos-produtos'
         const { data, error } = await supabaseClient
           .storage
           .from('fotos-produtos')
-          .upload(nomeArquivo, arquivo);
+          .upload(nomeArquivo, blob, {
+            contentType: 'image/jpeg',
+            upsert: false
+          });
 
         if (error) throw error;
 
-        // 4. Buscar a URL pública para confirmar
         const { data: urlData } = supabaseClient
           .storage
           .from('fotos-produtos')
           .getPublicUrl(nomeArquivo);
 
         status.style.color = "#10b981";
-        status.innerHTML = `✅ Sucesso!<br><small style="word-break: break-all;">${urlData.publicUrl}</small>`;
-        
+        status.innerHTML = `✅ Sucesso! Otimizado para ${ (blob.size / 1024).toFixed(1) } KB`;
+        console.log("Link otimizado:", urlData.publicUrl);
+
       } catch (err) {
         console.error(err);
         status.style.color = "#ef4444";
         status.innerText = "❌ Erro: " + err.message;
       }
-    });
+    }, 'image/jpeg', 0.7); // 0.7 é o nível de qualidade (70%)
+  };
+  // --- FIM DA COMPRESSÃO ---
+});
 
     // ==========================================
     // FUNÇÃO: BUSCAR PRODUTO
