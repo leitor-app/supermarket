@@ -12,7 +12,6 @@
     body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; padding: 20px; }
     .container { max-width: 450px; margin: auto; }
     
-    /* Estilização dos campos de texto */
     input { 
       width: 100%; 
       padding: 12px; 
@@ -24,7 +23,6 @@
       box-sizing: border-box;
     }
     
-    /* Botões */
     .btn { 
       width: 100%; 
       padding: 15px; 
@@ -39,8 +37,9 @@
     }
     .btn:active { opacity: 0.7; }
     .btn-secondary { background: #3b82f6; }
+    /* Estilo para o botão de câmera */
+    .btn-camera { background: #8b5cf6; } 
     
-    /* Cartões de interface */
     .card { 
       margin-top: 20px; 
       padding: 15px; 
@@ -51,6 +50,9 @@
     
     .divider { margin: 30px 0; border-top: 1px solid rgba(255,255,255,0.1); }
     #resultado { margin-top: 15px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid #10b981; }
+    
+    /* Estilo para a prévia da imagem */
+    .img-preview { width: 100%; border-radius: 8px; margin-top: 10px; display: none; border: 1px solid rgba(255,255,255,0.2); }
   </style>
 </head>
 <body>
@@ -70,27 +72,77 @@
       </div>
     </div>
 
+    <div class="card">
+      <h3>Teste de Foto (Storage)</h3>
+      <p style="font-size: 0.8em; color: #94a3b8;">Envie uma foto para o bucket 'fotos-produtos'</p>
+      
+      <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display: none;">
+      
+      <button class="btn btn-camera" onclick="document.getElementById('fotoInput').click()">
+        📸 Tirar Foto
+      </button>
+
+      <div id="statusUpload" style="font-size: 0.9em; margin-top: 5px;"></div>
+      <img id="previewFoto" class="img-preview" alt="Prévia">
+    </div>
+
     <div class="divider"></div>
 
     <div class="card">
       <h3>Novo Supermercado</h3>
-      <input type="text" id="nomeMercado" placeholder="Nome (Ex: Extra, Pão de Açúcar)">
+      <input type="text" id="nomeMercado" placeholder="Nome do mercado">
       <button class="btn btn-secondary" onclick="salvarMercado()">Salvar no Banco</button>
     </div>
   </div>
 
   <script>
-    // ==========================================
-    // CONFIGURAÇÃO DE CONEXÃO (DADOS REAIS)
-    // ==========================================
-    // URL encontrada no menu 'Data API'
     const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co'; 
-    
-    // Publishable Key encontrada no menu 'API Keys'
     const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7'; 
 
-    // Inicialização do Cliente Supabase
     const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
+
+    // ==========================================
+    // LÓGICA DE UPLOAD DE FOTO (STORAGE)
+    // ==========================================
+    document.getElementById('fotoInput').addEventListener('change', async function(e) {
+      const arquivo = e.target.files[0];
+      if (!arquivo) return;
+
+      const status = document.getElementById('statusUpload');
+      const preview = document.getElementById('previewFoto');
+
+      // 1. Mostrar preview local imediatamente
+      preview.src = URL.createObjectURL(arquivo);
+      preview.style.display = 'block';
+      status.innerText = "⏳ Enviando...";
+
+      // 2. Nome do arquivo único usando a data atual
+      const nomeArquivo = `teste_${Date.now()}.jpg`;
+
+      try {
+        // 3. Upload para o bucket 'fotos-produtos'
+        const { data, error } = await supabaseClient
+          .storage
+          .from('fotos-produtos')
+          .upload(nomeArquivo, arquivo);
+
+        if (error) throw error;
+
+        // 4. Buscar a URL pública para confirmar
+        const { data: urlData } = supabaseClient
+          .storage
+          .from('fotos-produtos')
+          .getPublicUrl(nomeArquivo);
+
+        status.style.color = "#10b981";
+        status.innerHTML = `✅ Sucesso!<br><small style="word-break: break-all;">${urlData.publicUrl}</small>`;
+        
+      } catch (err) {
+        console.error(err);
+        status.style.color = "#ef4444";
+        status.innerText = "❌ Erro: " + err.message;
+      }
+    });
 
     // ==========================================
     // FUNÇÃO: BUSCAR PRODUTO
@@ -98,64 +150,49 @@
     async function buscarProduto() {
       const codigo = document.getElementById('barcode').value.trim();
       const resDiv = document.getElementById('resultado');
-
-      if (!codigo) return alert("Por favor, insira um código.");
+      if (!codigo) return alert("Insira um código.");
 
       try {
-        // Consultamos a tabela 'produtos' filtrando pelo ID (código de barras)
         const { data, error } = await supabaseClient
           .from('produtos')
           .select(`nome, precos (valor, mercados (nome))`)
           .eq('id', codigo)
-          .single(); // Esperamos apenas 1 resultado único
+          .single();
 
         if (error) throw error;
 
         if (data) {
           resDiv.style.display = 'block';
           document.getElementById('prodNome').innerText = data.nome;
-          
-          // Lógica para exibir o preço se ele existir
           const infoPreco = data.precos && data.precos[0] 
                             ? `R$ ${data.precos[0].valor.toFixed(2)} (${data.precos[0].mercados.nome})` 
                             : "Sem preço registrado";
-          
           document.getElementById('prodPreco').innerText = infoPreco;
         }
       } catch (err) {
-        console.error("Erro na busca:", err.message);
-        alert("Produto não encontrado no banco de dados.");
+        alert("Produto não encontrado.");
         resDiv.style.display = 'none';
       }
     }
 
     // ==========================================
-    // FUNÇÃO: SALVAR MERCADO (TESTE DE GRAVAÇÃO)
+    // FUNÇÃO: SALVAR MERCADO
     // ==========================================
     async function salvarMercado() {
       const nomeDigitado = document.getElementById('nomeMercado').value.trim();
-
-      if (!nomeDigitado) {
-        alert("Digite o nome do supermercado primeiro.");
-        return;
-      }
+      if (!nomeDigitado) return alert("Digite o nome.");
 
       try {
-        // Tentamos inserir o dado na tabela 'mercados'
         const { data, error } = await supabaseClient
           .from('mercados')
           .insert([{ nome: nomeDigitado }])
           .select();
 
-        if (error) throw error; // Se houver erro (como RLS), pula para o 'catch'
-
-        alert("Sucesso! '" + nomeDigitado + "' foi salvo no Supabase.");
-        document.getElementById('nomeMercado').value = ""; // Limpa o input
-        
+        if (error) throw error;
+        alert("Mercado salvo!");
+        document.getElementById('nomeMercado').value = ""; 
       } catch (err) {
-        console.error("Falha na gravação:", err);
-        // O erro mais comum aqui será o 'Policy' (RLS) se você ainda não liberou no SQL Editor
-        alert("Erro ao salvar: " + err.message);
+        alert("Erro: " + err.message);
       }
     }
   </script>
