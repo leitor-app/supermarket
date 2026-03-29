@@ -9,11 +9,45 @@
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Cole aqui o seu CSS do Smart Scanner original */
     body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; padding: 20px; }
     .container { max-width: 450px; margin: auto; }
-    input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; }
-    .btn { width: 100%; padding: 15px; background: #10b981; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 12px; }
+    
+    /* Estilização dos campos de entrada */
+    input { 
+      width: 100%; 
+      padding: 12px; 
+      margin: 10px 0; 
+      border-radius: 8px; 
+      border: 1px solid rgba(255,255,255,0.2); 
+      background: rgba(0,0,0,0.2); 
+      color: white; 
+    }
+    
+    /* Botão principal (Verde) */
+    .btn { 
+      width: 100%; 
+      padding: 15px; 
+      background: #10b981; 
+      border: none; 
+      color: white; 
+      font-weight: bold; 
+      cursor: pointer; 
+      border-radius: 12px; 
+      margin-bottom: 10px;
+    }
+    
+    /* Botão secundário (Azul) para o cadastro */
+    .btn-secondary { background: #3b82f6; }
+    
+    .card { 
+      margin-top: 20px; 
+      padding: 15px; 
+      background: rgba(255,255,255,0.05); 
+      border-radius: 16px; 
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .divider { margin: 30px 0; border-top: 1px solid rgba(255,255,255,0.1); }
   </style>
 </head>
 <body>
@@ -22,12 +56,22 @@
     <h1>Supermarket Scanner</h1>
     <p>Conectado ao Supabase</p>
 
-    <input type="text" id="barcode" placeholder="Escaneie ou digite o código">
-    <button class="btn" onclick="buscarProduto()">Buscar Produto</button>
+    <div class="card">
+      <input type="text" id="barcode" placeholder="Escaneie ou digite o código">
+      <button class="btn" onclick="buscarProduto()">Buscar Produto</button>
 
-    <div id="resultado" style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; display: none;">
-      <h3 id="prodNome"></h3>
-      <p id="prodPreco"></p>
+      <div id="resultado" style="display: none;">
+        <h3 id="prodNome"></h3>
+        <p id="prodPreco"></p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card">
+      <h3>Cadastrar Supermercado</h3>
+      <input type="text" id="nomeMercado" placeholder="Ex: Atacadão, Carrefour...">
+      <button class="btn btn-secondary" onclick="salvarMercado()">Salvar no Banco</button>
     </div>
   </div>
 
@@ -35,21 +79,21 @@
     // ==========================================
     // CONFIGURAÇÃO DO SUPABASE
     // ==========================================
-    // Substitua pelos dados que aparecem no seu painel do Supabase (Project Settings > API)
     const SUPABASE_URL = 'SUA_URL_AQUI';
     const SUPABASE_KEY = 'SUA_ANON_KEY_AQUI';
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Inicializa o cliente Supabase
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // ==========================================
-    // FUNÇÃO DE BUSCA (A MÁGICA ACONTECE AQUI)
+    // FUNÇÃO: BUSCAR PRODUTO
     // ==========================================
     async function buscarProduto() {
       const codigo = document.getElementById('barcode').value;
       const resDiv = document.getElementById('resultado');
 
-      // No Supabase, a busca é uma linha só, sem loops manuais!
-      const { data, error } = await supabase
+      // Faz uma consulta unindo as tabelas produtos -> precos -> mercados
+      const { data, error } = await supabaseClient
         .from('produtos')
         .select(`
           nome, 
@@ -57,21 +101,49 @@
           precos (valor, data_hora, mercados (nome))
         `)
         .eq('id', codigo)
-        .single();
+        .single(); // Espera apenas um resultado
 
       if (error) {
-        console.log("Produto não encontrado no banco:", error.message);
-        alert("Produto não cadastrado ainda!");
+        alert("Produto não encontrado!");
         return;
       }
 
       if (data) {
         resDiv.style.display = 'block';
         document.getElementById('prodNome').innerText = data.nome;
-        
-        // Pega o último preço cadastrado (o Supabase já traz a lista)
         const ultimoPreco = data.precos[0] ? `R$ ${data.precos[0].valor}` : "Sem preço";
         document.getElementById('prodPreco').innerText = "Último preço: " + ultimoPreco;
+      }
+    }
+
+    // ==========================================
+    // FUNÇÃO: SALVAR MERCADO (TESTE DE GRAVAÇÃO)
+    // ==========================================
+    async function salvarMercado() {
+      // Captura o valor digitado no input
+      const nomeDigitado = document.getElementById('nomeMercado').value;
+
+      if (!nomeDigitado) {
+        alert("Por favor, digite o nome do supermercado.");
+        return;
+      }
+
+      // Comando .insert para gravar dados no Supabase
+      const { data, error } = await supabaseClient
+        .from('mercados') // Alvo: tabela mercados
+        .insert([
+          { nome: nomeDigitado } // Coluna 'nome' recebe o que foi digitado
+        ])
+        .select(); // Pede para retornar o dado gravado para confirmar
+
+      if (error) {
+        // Exibe erro caso o banco negue a gravação (ex: RLS bloqueado)
+        console.error("Erro na gravação:", error.message);
+        alert("Erro ao salvar: " + error.message);
+      } else {
+        // Sucesso!
+        alert("Sucesso! O mercado '" + nomeDigitado + "' foi gravado.");
+        document.getElementById('nomeMercado').value = ""; // Limpa o campo
       }
     }
   </script>
