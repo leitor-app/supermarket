@@ -116,8 +116,8 @@
       }
     }
 
-    // ==========================================
-    // BUSCA AUTOMÁTICA NA WEB (OPEN FOOD FACTS)
+   // ==========================================
+    // BUSCA AUTOMÁTICA NA WEB (VERSÃO COM CLONAGEM DE FOTO)
     // ==========================================
     async function buscarNaWebAutomatico(codigo) {
       const secaoCadastro = document.getElementById('secaoCadastro');
@@ -125,10 +125,10 @@
       const inputNome = document.getElementById('newName');
       const preview = document.getElementById('preview');
 
-      secaoCadastro.style.display = 'block'; // Mostra o formulário de cadastro
-      status.innerText = "🔍 Buscando na Web para facilitar cadastro...";
-      inputNome.value = ""; // Limpa o nome anterior
-      preview.src = "https://via.placeholder.com/200?text=Sem+Foto"; // Reset foto
+      secaoCadastro.style.display = 'block';
+      status.innerText = "🔍 Buscando na Web...";
+      inputNome.value = ""; 
+      preview.src = "https://via.placeholder.com/200?text=Buscando...";
 
       try {
         const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${codigo}.json`);
@@ -137,27 +137,53 @@
         if (data.status === 1 && data.product) {
           console.log("✅ Encontrado no OpenFoodFacts!");
           
-          // Preenche o nome se houver
           const nomeWeb = data.product.product_name || data.product.product_name_pt || "";
           inputNome.value = nomeWeb;
           
-          // Preenche a foto se houver
           if (data.product.image_url) {
-            urlFotoFinal = data.product.image_url;
-            preview.src = urlFotoFinal;
-            status.innerText = "✅ Produto e Foto encontrados na Web! Ajuste o nome e salve.";
-            status.style.color = "#10b981";
+            status.innerText = "⏳ Clonando foto para seu storage...";
+            
+            try {
+              // 1. Baixa a foto da web (transforma em Blob)
+              const resFoto = await fetch(data.product.image_url);
+              const blob = await resFoto.blob();
+              
+              // 2. Cria um nome único para o arquivo no seu Storage
+              const nomeArquivo = `auto_${codigo}_${Date.now()}.jpg`;
+              
+              // 3. Upload para o SEU Supabase Storage
+              const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                .from('fotos-produtos')
+                .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+
+              if (uploadError) throw uploadError;
+
+              // 4. Pega a URL pública do SEU arquivo
+              const { data: urlData } = supabaseClient.storage
+                .from('fotos-produtos')
+                .getPublicUrl(nomeArquivo);
+
+              urlFotoFinal = urlData.publicUrl; // A variável agora aponta para o SEU banco
+              preview.src = urlFotoFinal;
+              
+              status.innerText = "✅ Foto clonada com sucesso! Ajuste o nome e salve.";
+              status.style.color = "#10b981";
+            } catch (errorFoto) {
+              console.error("Erro ao clonar foto:", errorFoto);
+              status.innerText = "⚠️ Produto achado, mas erro ao salvar foto. Tire uma foto manual.";
+              status.style.color = "#f59e0b";
+            }
           } else {
-            status.innerText = "❌ Produto achado, mas sem foto. Tire uma foto manual.";
+            status.innerText = "❌ Produto achado, mas sem foto na Web.";
             status.style.color = "#94a3b8";
           }
         } else {
-          console.log("❌ Não encontrado na Web.");
-          status.innerText = "❌ Não encontrado na Web. Digite o nome e tire a foto.";
+          status.innerText = "❌ Não encontrado na Web. Preencha manualmente.";
           status.style.color = "#ef4444";
         }
       } catch (e) {
         status.innerText = "⚠️ Erro na busca da web. Preencha manualmente.";
+        console.error(e);
       }
     }
 
