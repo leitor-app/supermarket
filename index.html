@@ -3,55 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v8 - Coleta de Preços</title>
+  <title>Smart Scanner v9</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-    .smart-card { width: 100%; max-width: 400px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 25px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); }
+    .smart-card { width: 100%; max-width: 400px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 25px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); position: relative; }
     
+    .version-tag { position: absolute; top: 10px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); font-weight: bold; }
     h1 { text-align: center; color: #10b981; font-size: 1.8rem; margin: 0; font-weight: 700; }
     .subtitle { text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 0.85em; margin-bottom: 20px; }
     
-    label { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 20px; display: block; letter-spacing: 0.5px; }
-    input, select { width: 100%; padding: 14px; margin-top: 6px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; }
-    
-    /* Grid de Botões Superiores */
+    label { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 20px; display: block; }
+    input, select { width: 100%; padding: 14px; margin-top: 6px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; outline: none; }
+    input:focus { border-color: #10b981; }
+
     .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
     .btn { padding: 14px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 14px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
     .btn-cam { background: #10b981; }
-    .btn-search { background: #334155; }
-    .btn:active { transform: scale(0.95); }
+    .btn-search { background: transparent; border: 2px solid #334155; color: white; }
+    
+    /* Área de Resultado */
+    #areaResultado { display: none; margin-top: 25px; animation: fadeIn 0.4s ease; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+    .product-info { display: flex; align-items: center; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 16px; margin-bottom: 15px; }
+    .product-info img { width: 60px; height: 60px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; padding: 4px; }
+    .product-info h3 { margin: 0; font-size: 0.95em; }
 
-    /* Área do Produto Encontrado */
-    #areaResultado { display: none; margin-top: 25px; animation: fadeIn 0.4s ease; }
-    .product-info { display: flex; align-items: center; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); }
-    .product-info img { width: 70px; height: 70px; object-fit: contain; background: white; border-radius: 10px; padding: 5px; margin-right: 15px; }
-    .product-info h3 { margin: 0; font-size: 1em; color: #f8fafc; }
+    .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 18px; border: 1px solid rgba(16, 185, 129, 0.2); }
+    .btn-save { width: 100%; background: #10b981; margin-top: 15px; }
 
-    /* Formulário de Preço */
-    .price-form { margin-top: 20px; padding: 15px; background: rgba(16, 185, 129, 0.05); border-radius: 18px; border: 1px solid rgba(16, 185, 129, 0.2); }
-    .btn-save { width: 100%; background: #10b981; margin-top: 15px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-
+    /* Botões de Ação Inferiores (Fieis à imagem) */
     .action-group { margin-top: 30px; display: flex; flex-direction: column; gap: 10px; }
-    .btn-action { background: rgba(255, 255, 255, 0.03); border: 1px solid #334155; color: #94a3b8; border-radius: 14px; padding: 12px; text-align: left; font-size: 0.9em; display: flex; align-items: center; }
-    .btn-action i { width: 25px; color: #10b981; }
+    .btn-action { background: rgba(255, 255, 255, 0.03); border: 1px solid #334155; color: #cbd5e1; border-radius: 14px; padding: 12px 15px; text-align: left; font-size: 0.9em; display: flex; align-items: center; cursor: pointer; transition: 0.2s; }
+    .btn-action:hover { background: rgba(255,255,255,0.08); }
+    .btn-action i { width: 28px; color: #10b981; font-size: 1.1em; }
 
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
   </style>
 </head>
 <body>
 
   <div class="smart-card">
+    <div class="version-tag">VERSÃO 9.0</div>
     <h1>Smart Scanner</h1>
     <p class="subtitle">Produtos e Preços na sua Planilha</p>
     
-    <label>Pesquisar Código ou Nome</label>
+    <label>Pesquisar por Código ou Nome</label>
     <input type="text" id="barcodeInput" placeholder="Ex: Yakult ou 789...">
     
     <div class="button-group">
-      <button class="btn btn-cam" onclick="abrirCamera()"><i class="fas fa-camera"></i> Câmera</button>
+      <button class="btn btn-cam" onclick="alert('Iniciando Câmera...')"><i class="fas fa-camera"></i> Câmera</button>
       <button class="btn btn-search" id="btnBuscar" onclick="buscarNoBanco()"><i class="fas fa-search"></i> Buscar</button>
     </div>
 
@@ -59,19 +61,19 @@
       <div class="product-info">
         <img id="resFoto" src="">
         <div>
-          <h3 id="resNome">Nome do Produto</h3>
+          <h3 id="resNome"></h3>
           <small id="resEan" style="color:#64748b"></small>
         </div>
       </div>
 
       <div class="price-form">
-        <label>Qual o Preço agora?</label>
-        <input type="number" id="inputPreco" step="0.01" placeholder="R$ 0,00">
+        <label>Valor do Produto (R$)</label>
+        <input type="number" id="inputPreco" step="0.01" placeholder="0.00">
         
         <label>Onde você está?</label>
         <select id="selectMercado">
           <option value="">Selecione um Supermercado...</option>
-          </select>
+        </select>
         
         <button class="btn btn-save" onclick="salvarNovoPreco()">
           <i class="fas fa-check-circle"></i> &nbsp; SALVAR PREÇO
@@ -80,8 +82,15 @@
     </div>
 
     <div class="action-group">
-      <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
-      <button class="btn btn-action"><i class="fas fa-clipboard-list"></i> Minha Lista de Compras</button>
+      <button class="btn btn-action" onclick="alert('Lendo comprovante...')">
+        <i class="fas fa-file-invoice-dollar"></i> Ler Comprovante com IA
+      </button>
+      <button class="btn btn-action">
+        <i class="fas fa-clipboard-list"></i> Minha Lista de Compras
+      </button>
+      <button class="btn btn-action" onclick="cadastrarLoja()">
+        <i class="fas fa-store"></i> Cadastrar Supermercado
+      </button>
     </div>
   </div>
 
@@ -92,22 +101,22 @@
 
     let eanAtual = "";
 
-    // Ao carregar a página, já puxa os mercados para o Select
     window.onload = carregarMercados;
 
     async function carregarMercados() {
       const select = document.getElementById('selectMercado');
-      const { data, error } = await supabaseClient.from('supermercados').select('id, nome').order('nome');
-      
-      if (data) {
-        select.innerHTML = '<option value="">Selecione um Supermercado...</option>';
-        data.forEach(m => {
-          let opt = document.createElement('option');
-          opt.value = m.id;
-          opt.innerText = m.nome;
-          select.appendChild(opt);
-        });
-      }
+      try {
+        const { data, error } = await supabaseClient.from('supermercados').select('id, nome').order('nome');
+        if (data) {
+          select.innerHTML = '<option value="">Selecione um Supermercado...</option>';
+          data.forEach(m => {
+            let opt = document.createElement('option');
+            opt.value = m.id;
+            opt.innerText = m.nome;
+            select.appendChild(opt);
+          });
+        }
+      } catch(e) { console.error("Erro ao carregar lojas"); }
     }
 
     async function buscarNoBanco() {
@@ -123,8 +132,8 @@
       if (data) {
         exibirCardPreco(data);
       } else {
-        alert("Produto não encontrado. Deseja cadastrar?");
-        // Aqui poderíamos chamar a busca na Web, mas vamos focar no seu pedido da tela 1
+        alert("Produto não encontrado no banco local.");
+        // Futuro: integrar busca OpenFoodFacts aqui
       }
     }
 
@@ -133,9 +142,8 @@
       document.getElementById('areaResultado').style.display = 'block';
       document.getElementById('resNome').innerText = produto.nome;
       document.getElementById('resEan').innerText = "EAN: " + produto.id;
-      document.getElementById('resFoto').src = produto.foto_url || "https://via.placeholder.com/70";
+      document.getElementById('resFoto').src = produto.foto_url || "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E";
       document.getElementById('inputPreco').value = "";
-      document.getElementById('inputPreco').focus();
     }
 
     async function salvarNovoPreco() {
@@ -143,7 +151,7 @@
       const mercadoId = document.getElementById('selectMercado').value;
 
       if (!preco || !mercadoId) {
-        return alert("⚠️ ERRO: Informe o preço e selecione o supermercado!");
+        return alert("⚠️ Selecione o supermercado e informe o preço!");
       }
 
       const { error } = await supabaseClient.from('precos').insert({
@@ -156,7 +164,7 @@
       if (error) {
         alert("Erro ao salvar: " + error.message);
       } else {
-        alert("✅ Preço registrado com sucesso!");
+        alert("✅ Preço registrado!");
         document.getElementById('areaResultado').style.display = 'none';
         document.getElementById('barcodeInput').value = "";
       }
@@ -165,12 +173,13 @@
     async function cadastrarLoja() {
       const nome = prompt("Nome do novo Supermercado:");
       if (!nome) return;
-      await supabaseClient.from('supermercados').insert([{ nome: nome }]);
-      carregarMercados(); // Atualiza a lista na hora
-      alert("Loja cadastrada!");
+      const { error } = await supabaseClient.from('supermercados').insert([{ nome: nome }]);
+      if (error) alert(error.message);
+      else {
+        alert("Loja cadastrada!");
+        carregarMercados();
+      }
     }
-
-    function abrirCamera() { alert("Abrindo câmera para EAN..."); }
   </script>
 </body>
 </html>
