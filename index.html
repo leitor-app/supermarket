@@ -11,42 +11,10 @@
   <style>
     body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; padding: 20px; }
     .container { max-width: 450px; margin: auto; }
-    
-    /* Estilização dos campos de entrada */
-    input { 
-      width: 100%; 
-      padding: 12px; 
-      margin: 10px 0; 
-      border-radius: 8px; 
-      border: 1px solid rgba(255,255,255,0.2); 
-      background: rgba(0,0,0,0.2); 
-      color: white; 
-    }
-    
-    /* Botão principal (Verde) */
-    .btn { 
-      width: 100%; 
-      padding: 15px; 
-      background: #10b981; 
-      border: none; 
-      color: white; 
-      font-weight: bold; 
-      cursor: pointer; 
-      border-radius: 12px; 
-      margin-bottom: 10px;
-    }
-    
-    /* Botão secundário (Azul) para o cadastro */
+    input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: white; }
+    .btn { width: 100%; padding: 15px; background: #10b981; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 12px; margin-bottom: 10px; }
     .btn-secondary { background: #3b82f6; }
-    
-    .card { 
-      margin-top: 20px; 
-      padding: 15px; 
-      background: rgba(255,255,255,0.05); 
-      border-radius: 16px; 
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-    
+    .card { margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); }
     .divider { margin: 30px 0; border-top: 1px solid rgba(255,255,255,0.1); }
   </style>
 </head>
@@ -59,7 +27,6 @@
     <div class="card">
       <input type="text" id="barcode" placeholder="Escaneie ou digite o código">
       <button class="btn" onclick="buscarProduto()">Buscar Produto</button>
-
       <div id="resultado" style="display: none;">
         <h3 id="prodNome"></h3>
         <p id="prodPreco"></p>
@@ -76,14 +43,12 @@
   </div>
 
   <script>
-    // ==========================================
-    // CONFIGURAÇÃO DO SUPABASE
-    // ==========================================
-    const SUPABASE_URL = 'SUA_URL_AQUI';
-    const SUPABASE_KEY = 'SUA_ANON_KEY_AQUI';
+    // 1. Definição das constantes (Troque pelos seus dados reais)
+    const URL_BANCO = 'SUA_URL_AQUI';
+    const CHAVE_ANON = 'SUA_ANON_KEY_AQUI';
 
-    // Inicializa o cliente Supabase
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 2. Inicialização Global (Garante que o cliente exista antes das funções serem chamadas)
+    const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
     // ==========================================
     // FUNÇÃO: BUSCAR PRODUTO
@@ -92,58 +57,56 @@
       const codigo = document.getElementById('barcode').value;
       const resDiv = document.getElementById('resultado');
 
-      // Faz uma consulta unindo as tabelas produtos -> precos -> mercados
-      const { data, error } = await supabaseClient
-        .from('produtos')
-        .select(`
-          nome, 
-          foto_url, 
-          precos (valor, data_hora, mercados (nome))
-        `)
-        .eq('id', codigo)
-        .single(); // Espera apenas um resultado
+      if (!codigo) return alert("Digite um código!");
 
-      if (error) {
-        alert("Produto não encontrado!");
-        return;
-      }
+      try {
+        const { data, error } = await supabaseClient
+          .from('produtos')
+          .select(`nome, precos (valor, mercados (nome))`)
+          .eq('id', codigo)
+          .single();
 
-      if (data) {
-        resDiv.style.display = 'block';
-        document.getElementById('prodNome').innerText = data.nome;
-        const ultimoPreco = data.precos[0] ? `R$ ${data.precos[0].valor}` : "Sem preço";
-        document.getElementById('prodPreco').innerText = "Último preço: " + ultimoPreco;
+        if (error) throw error;
+
+        if (data) {
+          resDiv.style.display = 'block';
+          document.getElementById('prodNome').innerText = data.nome;
+          const preco = data.precos[0] ? `R$ ${data.precos[0].valor}` : "Sem preço";
+          document.getElementById('prodPreco').innerText = "Último: " + preco;
+        }
+      } catch (err) {
+        console.error("Erro na busca:", err.message);
+        alert("Produto não encontrado.");
       }
     }
 
     // ==========================================
-    // FUNÇÃO: SALVAR MERCADO (TESTE DE GRAVAÇÃO)
+    // FUNÇÃO: SALVAR MERCADO
     // ==========================================
     async function salvarMercado() {
-      // Captura o valor digitado no input
+      // Verificação de segurança: O cliente foi carregado?
+      if (!supabaseClient) return alert("Erro de conexão com o Supabase.");
+
       const nomeDigitado = document.getElementById('nomeMercado').value;
+      if (!nomeDigitado) return alert("Digite o nome do supermercado.");
 
-      if (!nomeDigitado) {
-        alert("Por favor, digite o nome do supermercado.");
-        return;
-      }
+      try {
+        // .insert([]) -> Enviando os dados para a tabela 'mercados'
+        const { data, error } = await supabaseClient
+          .from('mercados')
+          .insert([{ nome: nomeDigitado }])
+          .select();
 
-      // Comando .insert para gravar dados no Supabase
-      const { data, error } = await supabaseClient
-        .from('mercados') // Alvo: tabela mercados
-        .insert([
-          { nome: nomeDigitado } // Coluna 'nome' recebe o que foi digitado
-        ])
-        .select(); // Pede para retornar o dado gravado para confirmar
+        // Se houver erro (como falta de permissão RLS), cai aqui
+        if (error) throw error;
 
-      if (error) {
-        // Exibe erro caso o banco negue a gravação (ex: RLS bloqueado)
-        console.error("Erro na gravação:", error.message);
-        alert("Erro ao salvar: " + error.message);
-      } else {
-        // Sucesso!
-        alert("Sucesso! O mercado '" + nomeDigitado + "' foi gravado.");
-        document.getElementById('nomeMercado').value = ""; // Limpa o campo
+        alert("Sucesso! '" + nomeDigitado + "' gravado no Supabase.");
+        document.getElementById('nomeMercado').value = ""; 
+        
+      } catch (err) {
+        // Log detalhado para te ajudar no estudo via Console (F12)
+        console.error("Erro ao gravar dado:", err);
+        alert("Erro no banco: " + err.message);
       }
     }
   </script>
