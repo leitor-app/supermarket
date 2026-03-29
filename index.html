@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v9</title>
+  <title>Smart Scanner v9.1</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -24,7 +24,6 @@
     .btn-cam { background: #10b981; }
     .btn-search { background: transparent; border: 2px solid #334155; color: white; }
     
-    /* Área de Resultado */
     #areaResultado { display: none; margin-top: 25px; animation: fadeIn 0.4s ease; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
     .product-info { display: flex; align-items: center; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 16px; margin-bottom: 15px; }
     .product-info img { width: 60px; height: 60px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; padding: 4px; }
@@ -33,10 +32,8 @@
     .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 18px; border: 1px solid rgba(16, 185, 129, 0.2); }
     .btn-save { width: 100%; background: #10b981; margin-top: 15px; }
 
-    /* Botões de Ação Inferiores (Fieis à imagem) */
     .action-group { margin-top: 30px; display: flex; flex-direction: column; gap: 10px; }
     .btn-action { background: rgba(255, 255, 255, 0.03); border: 1px solid #334155; color: #cbd5e1; border-radius: 14px; padding: 12px 15px; text-align: left; font-size: 0.9em; display: flex; align-items: center; cursor: pointer; transition: 0.2s; }
-    .btn-action:hover { background: rgba(255,255,255,0.08); }
     .btn-action i { width: 28px; color: #10b981; font-size: 1.1em; }
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
@@ -45,7 +42,7 @@
 <body>
 
   <div class="smart-card">
-    <div class="version-tag">VERSÃO 9.0</div>
+    <div class="version-tag">VERSÃO 9.1</div>
     <h1>Smart Scanner</h1>
     <p class="subtitle">Produtos e Preços na sua Planilha</p>
     
@@ -72,10 +69,10 @@
         
         <label>Onde você está?</label>
         <select id="selectMercado">
-          <option value="">Selecione um Supermercado...</option>
+          <option value="">Carregando lojas...</option>
         </select>
         
-        <button class="btn btn-save" onclick="salvarNovoPreco()">
+        <button class="btn btn-save" id="btnSalvarPreco" onclick="salvarNovoPreco()">
           <i class="fas fa-check-circle"></i> &nbsp; SALVAR PREÇO
         </button>
       </div>
@@ -132,8 +129,7 @@
       if (data) {
         exibirCardPreco(data);
       } else {
-        alert("Produto não encontrado no banco local.");
-        // Futuro: integrar busca OpenFoodFacts aqui
+        alert("Produto não encontrado no seu banco.");
       }
     }
 
@@ -149,24 +145,33 @@
     async function salvarNovoPreco() {
       const preco = document.getElementById('inputPreco').value;
       const mercadoId = document.getElementById('selectMercado').value;
+      const btn = document.getElementById('btnSalvarPreco');
 
       if (!preco || !mercadoId) {
         return alert("⚠️ Selecione o supermercado e informe o preço!");
       }
 
-      const { error } = await supabaseClient.from('precos').insert({
-        produto_id: eanAtual,
-        valor: parseFloat(preco),
-        supermercado_id: mercadoId,
-        data_coleta: new Date().toISOString()
-      });
+      btn.disabled = true;
+      btn.innerHTML = "⏳ Gravando...";
 
-      if (error) {
-        alert("Erro ao salvar: " + error.message);
-      } else {
-        alert("✅ Preço registrado!");
+      try {
+        const { error } = await supabaseClient.from('precos').insert([{
+          produto_id: eanAtual,
+          valor: parseFloat(preco),
+          supermercado_id: parseInt(mercadoId),
+          data_coleta: new Date().toISOString()
+        }]);
+
+        if (error) throw error;
+
+        alert("✅ Preço registrado com sucesso!");
         document.getElementById('areaResultado').style.display = 'none';
         document.getElementById('barcodeInput').value = "";
+      } catch (err) {
+        alert("Erro ao salvar: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> &nbsp; SALVAR PREÇO';
       }
     }
 
