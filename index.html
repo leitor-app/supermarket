@@ -212,29 +212,50 @@
     });
 
     // ==========================================
-    // SALVAR PRODUTO NO SUPABASE
+    // SALVAR PRODUTO NO SUPABASE (VERSÃO CORRIGIDA)
     // ==========================================
     async function salvarProduto() {
       const id = document.getElementById('mainBarcode').value.trim();
       const nome = document.getElementById('newName').value.trim();
       const btn = document.getElementById('btnSalvar');
 
-      if (!id || !nome || !urlFotoFinal) {
-        return alert("Preencha Código, Nome e garanta a Foto (Web ou Manual)!");
+      // LOG DE DEBUG: Vamos ver o que tem na variável antes de enviar
+      console.log("Tentando salvar produto...");
+      console.log("ID:", id);
+      console.log("Nome:", nome);
+      console.log("URL da Foto que será enviada:", urlFotoFinal);
+
+      if (!id || !nome) {
+        return alert("Por favor, preencha o código e o nome!");
       }
 
-      btn.innerText = "Salvando...";
+      if (!urlFotoFinal || urlFotoFinal === "") {
+        return alert("Aguarde a foto carregar ou tire uma foto manual!");
+      }
+
+      btn.innerText = "⏳ Gravando no Banco...";
       btn.disabled = true;
 
       try {
-        const { error } = await supabaseClient
+        const { data, error } = await supabaseClient
           .from('produtos')
-          .insert([{ id: id, nome: nome, foto_url: urlFotoFinal }]);
+          .insert([
+            { 
+              id: id, 
+              nome: nome, 
+              foto_url: urlFotoFinal // Aqui enviamos a URL capturada
+            }
+          ])
+          .select(); // Pedimos o retorno para confirmar
 
-        if (error) throw error;
+        if (error) {
+           console.error("Erro detalhado do Supabase:", error);
+           throw error;
+        }
 
-        alert("Produto cadastrado com sucesso!");
-        location.reload(); // Recarrega para limpar tudo
+        console.log("Sucesso ao salvar:", data);
+        alert("✅ Produto '" + nome + "' cadastrado com sucesso!");
+        location.reload(); 
 
       } catch (err) {
         alert("Erro ao salvar: " + err.message);
