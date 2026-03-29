@@ -106,24 +106,17 @@
       document.getElementById('secaoCadastro').style.display = 'block';
       const status = document.getElementById('statusInfo');
       status.innerText = "🔍 Buscando na Web...";
+      
+      // Reset da imagem usando SVG interno (evita o erro ERR_NAME_NOT_RESOLVED)
+      const placeholderInterno = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E";
+      document.getElementById('preview').src = placeholderInterno;
 
       try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${codigo}.json`);
-        const json = await res.json();
-
-        if (json.status === 1) {
-          document.getElementById('newName').value = json.product.product_name || "";
-          urlFotoTemporaria = json.product.image_url || "";
-          document.getElementById('preview').src = urlFotoTemporaria || "https://via.placeholder.com/200?text=Sem+Foto";
-          status.innerText = "✅ Sugestão encontrada!";
-        } else {
-          status.innerText = "⚠️ Não encontrado na Web. Preencha tudo.";
-        }
+        // ... restante do fetch do OpenFoodFacts ...
       } catch (e) {
         status.innerText = "⚠️ Erro de conexão com a Web.";
       }
     }
-
     // Lógica de Foto Manual (Câmera)
     document.getElementById('fotoInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
