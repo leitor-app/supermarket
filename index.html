@@ -3,72 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v10.1 - Autocomplete</title>
+  <title>Smart Scanner v10.2 - OCR & Padronização</title>
+  
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* ... (Mantendo estilos anteriores) ... */
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-    .smart-card { width: 100%; max-width: 420px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); position: relative; }
-    .version-tag { position: absolute; top: 10px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); font-weight: bold; }
-    h1 { text-align: center; color: #10b981; font-size: 1.6rem; margin: 0; font-weight: 700; }
-    label { font-size: 0.7em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
-    input, select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; }
 
-    /* NOVO: Estilo da Lista de Sugestões */
-    .autocomplete-list { 
-      position: absolute; 
-      width: calc(100% - 40px); 
-      background: #1e293b; 
-      border: 1px solid #334155; 
-      border-radius: 0 0 12px 12px; 
-      max-height: 200px; 
-      overflow-y: auto; 
-      z-index: 100; 
-      display: none;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-    }
-    .suggestion-item { 
-      padding: 12px; 
-      border-bottom: 1px solid rgba(255,255,255,0.05); 
-      cursor: pointer; 
-      display: flex; 
-      align-items: center; 
-    }
+  <style>
+    :root { --primary: #10b981; --bg: #0f172a; --card: rgba(30, 41, 59, 0.8); }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    
+    .smart-card { width: 100%; max-width: 420px; background: var(--card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); position: relative; }
+    .version-tag { position: absolute; top: 10px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); font-weight: bold; }
+    
+    h1 { text-align: center; color: var(--primary); font-size: 1.6rem; margin: 0; font-weight: 700; }
+    label { font-size: 0.7em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
+    
+    input, select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; outline: none; }
+    input:focus { border-color: var(--primary); }
+
+    /* Autocomplete List */
+    .autocomplete-list { position: absolute; width: calc(100% - 40px); background: #1e293b; border: 1px solid #334155; border-radius: 0 0 12px 12px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+    .suggestion-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; }
     .suggestion-item:hover { background: #334155; }
     .suggestion-item img { width: 30px; height: 30px; border-radius: 4px; margin-right: 10px; background: white; object-fit: contain; }
-    .suggestion-item div { font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* Botões */
     .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-    .btn { padding: 12px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-    .btn-cam { background: #10b981; }
+    .btn { padding: 12px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 12px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .btn-cam { background: var(--primary); }
     .btn-search { background: transparent; border: 2px solid #334155; }
-    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; display: none; border: 2px solid #10b981; }
+    .btn-save { width: 100%; background: var(--primary); margin-top: 10px; }
+
+    /* Scanner e Resultados */
+    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; display: none; border: 2px solid var(--primary); }
     #areaResultado { display: none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
-    .product-header { display: flex; align-items: center; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px; }
-    .product-header img { width: 50px; height: 50px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; }
-    .scroll-precos { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
-    .card-preco { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .card-preco.mais-barato { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.08); }
-    .valor-loja { color: #10b981; font-weight: 800; }
-    .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(16, 185, 129, 0.2); }
-    .btn-save { width: 100%; background: #10b981; margin-top: 10px; }
+    
+    .scroll-precos { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+    .card-preco { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .card-preco.mais-barato { border-left: 4px solid var(--primary); background: rgba(16, 185, 129, 0.08); }
+
+    /* Seção OCR */
+    #listaOcr { display: none; margin-top: 20px; background: rgba(59, 130, 246, 0.05); border-radius: 15px; padding: 15px; border: 1px solid #3b82f6; }
+    .item-ocr { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.8em; }
+    .btn-confirm { background: var(--primary); padding: 4px 8px; border-radius: 6px; border: none; color: white; cursor: pointer; font-size: 0.8em; }
+
     .action-group { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
-    .btn-action { background: rgba(255, 255, 255, 0.02); border: 1px solid #334155; color: #cbd5e1; border-radius: 12px; padding: 10px 15px; text-align: left; font-size: 0.85em; display: flex; align-items: center; }
-    .btn-action i { width: 25px; color: #10b981; }
+    .btn-action { background: rgba(255, 255, 255, 0.02); border: 1px solid #334155; color: #cbd5e1; border-radius: 12px; padding: 12px; text-align: left; font-size: 0.85em; display: flex; align-items: center; cursor: pointer; }
   </style>
 </head>
 <body>
 
   <div class="smart-card">
-    <div class="version-tag">VERSÃO 10.1</div>
+    <div class="version-tag">VERSÃO 10.2</div>
     <h1>Smart Scanner</h1>
     
-    <label>Pesquisar por Código ou Nome</label>
-    <input type="text" id="barcodeInput" placeholder="Escaneie ou digite..." oninput="buscarSugestoes()" autocomplete="off">
-    
+    <label>Pesquisar Produto</label>
+    <input type="text" id="barcodeInput" placeholder="Escaneie ou digite o nome..." oninput="buscarSugestoes()" autocomplete="off">
     <div id="autocompleteList" class="autocomplete-list"></div>
     
     <div class="button-group">
@@ -79,26 +72,40 @@
     <div id="reader"></div>
 
     <div id="areaResultado">
-      <div class="product-header">
-        <img id="resFoto" src="">
+      <div style="display:flex; align-items:center; margin-bottom:10px;">
+        <img id="resFoto" style="width:50px; height:50px; object-fit:contain; background:white; border-radius:8px; margin-right:12px;">
         <div>
           <h3 id="resNome" style="margin:0; font-size:0.9em;"></h3>
           <small id="resEan" style="color:#64748b; font-size:0.7em;"></small>
         </div>
       </div>
       <div id="listaPrecos" class="scroll-precos"></div>
-      <div class="price-form">
-        <input type="number" id="inputPreco" step="0.01" placeholder="Novo Preço R$ 0.00">
-        <select id="selectMercado" style="margin-top: 10px;">
-          <option value="">Selecione o Mercado...</option>
-        </select>
-        <button class="btn btn-save" onclick="salvarNovoPreco()">💾 ATUALIZAR PREÇO</button>
-      </div>
+    </div>
+
+    <div class="price-form" style="margin-top:15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top:10px;">
+      <label>Valor Unitário (R$)</label>
+      <input type="number" id="inputPreco" step="0.01" placeholder="0.00">
+      
+      <label>Supermercado (Obrigatório)</label>
+      <select id="selectMercado">
+        <option value="">Selecione um Supermercado...</option>
+      </select>
+      
+      <button class="btn btn-save" onclick="salvarNovoPreco()">💾 SALVAR NO BANCO</button>
+    </div>
+
+    <div id="listaOcr">
+      <h3 style="font-size:0.85em; color:#3b82f6; margin:0 0 10px 0;">📝 Itens Detectados no Cupom</h3>
+      <p id="ocrStatus" style="font-size:0.7em; color:#94a3b8">Aguardando foto...</p>
+      <div id="itensDetectados"></div>
     </div>
 
     <div class="action-group">
-      <button class="btn btn-action"><i class="fas fa-file-invoice-dollar"></i> Ler Comprovante com IA</button>
-      <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
+      <button class="btn btn-action" onclick="document.getElementById('fotoCupom').click()">
+        <i class="fas fa-file-invoice-dollar" style="color:var(--primary)"></i> &nbsp; Ler Comprovante (IA)
+      </button>
+      <input type="file" id="fotoCupom" accept="image/*" capture="environment" style="display:none" onchange="processarCupom(this)">
+      <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> &nbsp; Cadastrar Supermercado</button>
     </div>
   </div>
 
@@ -117,7 +124,7 @@
       const { data } = await supabaseClient.from('supermercados').select('id, nome').order('nome');
       const select = document.getElementById('selectMercado');
       if (data) {
-        select.innerHTML = '<option value="">Selecione o Mercado...</option>';
+        select.innerHTML = '<option value="">Selecione um Supermercado...</option>';
         data.forEach(m => {
           let opt = document.createElement('option');
           opt.value = m.id; opt.innerText = m.nome;
@@ -126,124 +133,129 @@
       }
     }
 
-    // --- NOVO: BUSCA DE SUGESTÕES (AUTOCOMPLETE) ---
+    // --- AUTOCOMPLETE ---
     async function buscarSugestoes() {
       const termo = document.getElementById('barcodeInput').value.trim();
       const lista = document.getElementById('autocompleteList');
+      if (termo.length < 2) { lista.style.display = 'none'; return; }
 
-      if (termo.length < 2) {
-        lista.style.display = 'none';
-        return;
-      }
-
-      // Debounce: Evita múltiplas chamadas rápidas ao Supabase
       clearTimeout(timeoutBusca);
       timeoutBusca = setTimeout(async () => {
-        const { data, error } = await supabaseClient
-          .from('produtos')
-          .select('id, nome, foto_url')
-          .ilike('nome', `%${termo}%`)
-          .limit(5);
-
+        const { data } = await supabaseClient.from('produtos').select('id, nome, foto_url').ilike('nome', `%${termo}%`).limit(5);
         if (data && data.length > 0) {
-          lista.innerHTML = "";
-          lista.style.display = 'block';
+          lista.innerHTML = ""; lista.style.display = 'block';
           data.forEach(p => {
             const item = document.createElement('div');
             item.className = 'suggestion-item';
-            item.innerHTML = `
-              <img src="${p.foto_url || ''}">
-              <div>${p.nome}</div>
-            `;
-            item.onclick = () => {
-              document.getElementById('barcodeInput').value = p.id;
-              lista.style.display = 'none';
-              buscarHibrida(); // Já busca os preços do produto selecionado
-            };
+            item.innerHTML = `<img src="${p.foto_url || ''}"><div>${p.nome}</div>`;
+            item.onclick = () => { document.getElementById('barcodeInput').value = p.id; lista.style.display = 'none'; buscarHibrida(); };
             lista.appendChild(item);
           });
-        } else {
-          lista.style.display = 'none';
-        }
-      }, 300); 
+        } else { lista.style.display = 'none'; }
+      }, 300);
     }
 
-    // Fecha a lista se clicar fora dela
-    document.addEventListener('click', (e) => {
-      if (e.target.id !== 'barcodeInput') {
-        document.getElementById('autocompleteList').style.display = 'none';
-      }
-    });
-
-    // --- LÓGICA DO SCANNER ---
+    // --- SCANNER ---
     function toggleScanner() {
       const readerDiv = document.getElementById('reader');
-      if (readerDiv.style.display === 'block') { pararScanner(); } 
-      else { readerDiv.style.display = 'block'; iniciarScanner(); }
-    }
-
-    function iniciarScanner() {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (decodedText) => {
-        document.getElementById('barcodeInput').value = decodedText;
-        pararScanner();
-        buscarHibrida();
-      });
-    }
-
-    function pararScanner() {
-      if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; });
-    }
-
-    // --- BUSCA HÍBRIDA ---
-    async function buscarHibrida() {
-      const termo = document.getElementById('barcodeInput').value.trim();
-      if (!termo) return;
-      document.getElementById('autocompleteList').style.display = 'none';
-
-      const { data } = await supabaseClient
-        .from('produtos')
-        .select(`id, nome, foto_url, precos (valor, data_coleta, supermercado_id, supermercados (nome))`)
-        .or(`id.eq.${termo},nome.ilike.%${termo}%`)
-        .maybeSingle();
-
-      if (data) exibirResultados(data);
-      else alert("Não encontrado.");
-    }
-
-    function exibirResultados(produto) {
-      eanAtual = produto.id;
-      document.getElementById('areaResultado').style.display = 'block';
-      document.getElementById('resNome').innerText = produto.nome;
-      document.getElementById('resEan').innerText = "EAN: " + produto.id;
-      document.getElementById('resFoto').src = produto.foto_url || "";
-      const listaDiv = document.getElementById('listaPrecos');
-      listaDiv.innerHTML = "";
-      if (produto.precos) {
-        const ultimos = {};
-        produto.precos.forEach(p => { if (!ultimos[p.supermercado_id] || new Date(p.data_coleta) > new Date(ultimos[p.supermercado_id].data_coleta)) ultimos[p.supermercado_id] = p; });
-        const lista = Object.values(ultimos).sort((a,b) => a.valor - b.valor);
-        lista.forEach(p => {
-          const card = document.createElement('div');
-          card.className = `card-preco ${p.valor === lista[0].valor ? 'mais-barato' : ''}`;
-          card.onclick = () => { document.getElementById('selectMercado').value = p.supermercado_id; document.getElementById('inputPreco').value = p.valor; };
-          card.innerHTML = `<span>${p.supermercados.nome}</span><span class="valor-loja">R$ ${p.valor.toFixed(2)}</span>`;
-          listaDiv.appendChild(card);
+      if (readerDiv.style.display === 'block') { 
+        if(html5QrCode) html5QrCode.stop().then(() => readerDiv.style.display = 'none');
+      } else { 
+        readerDiv.style.display = 'block'; 
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+          document.getElementById('barcodeInput').value = text;
+          html5QrCode.stop().then(() => { readerDiv.style.display = 'none'; buscarHibrida(); });
         });
       }
     }
 
+    // --- BUSCA E RESULTADOS ---
+    async function buscarHibrida() {
+      const termo = document.getElementById('barcodeInput').value.trim();
+      if (!termo) return;
+      const { data } = await supabaseClient.from('produtos').select(`id, nome, foto_url, precos (valor, data_coleta, supermercado_id, supermercados (nome))`).or(`id.eq.${termo},nome.ilike.%${termo}%`).maybeSingle();
+      if (data) {
+        eanAtual = data.id;
+        document.getElementById('areaResultado').style.display = 'block';
+        document.getElementById('resNome').innerText = data.nome;
+        document.getElementById('resEan').innerText = "EAN: " + data.id;
+        document.getElementById('resFoto').src = data.foto_url || "";
+        
+        const listaDiv = document.getElementById('listaPrecos');
+        listaDiv.innerHTML = "";
+        if (data.precos && data.precos.length > 0) {
+           const ultimos = {};
+           data.precos.forEach(p => { if(!ultimos[p.supermercado_id] || new Date(p.data_coleta) > new Date(ultimos[p.supermercado_id].data_coleta)) ultimos[p.supermercado_id] = p; });
+           const ordenados = Object.values(ultimos).sort((a,b) => a.valor - b.valor);
+           ordenados.forEach(p => {
+             const card = document.createElement('div');
+             card.className = `card-preco ${p.valor === ordenados[0].valor ? 'mais-barato' : ''}`;
+             card.onclick = () => { document.getElementById('selectMercado').value = p.supermercado_id; document.getElementById('inputPreco').value = p.valor; };
+             card.innerHTML = `<span>${p.supermercados.nome}</span><b style="color:var(--primary)">R$ ${p.valor.toFixed(2)}</b>`;
+             listaDiv.appendChild(card);
+           });
+        }
+      }
+    }
+
+    // --- SALVAMENTO PADRONIZADO ---
     async function salvarNovoPreco() {
       const preco = document.getElementById('inputPreco').value;
       const mercadoId = document.getElementById('selectMercado').value;
-      if (!preco || !mercadoId) return alert("Erro!");
-      await supabaseClient.from('precos').insert([{ produto_id: eanAtual, valor: parseFloat(preco), supermercado_id: parseInt(mercadoId), data_coleta: new Date().toISOString() }]);
-      alert("✅ Salvo!");
-      buscarHibrida();
+      if (!preco || !mercadoId || !eanAtual) return alert("⚠️ Selecione o mercado e informe o preço!");
+
+      const { error } = await supabaseClient.from('precos').insert([{
+        produto_id: eanAtual, valor: parseFloat(preco), supermercado_id: parseInt(mercadoId), data_coleta: new Date().toISOString()
+      }]);
+      if(!error) { alert("✅ Salvo!"); buscarHibrida(); } else { alert("Erro: " + error.message); }
+    }
+
+    // --- OCR IA (CUPOM FISCAL) ---
+    async function processarCupom(input) {
+      const file = input.files[0]; if (!file) return;
+      const status = document.getElementById('ocrStatus');
+      const listaDiv = document.getElementById('listaOcr');
+      const itensDiv = document.getElementById('itensDetectados');
+
+      listaDiv.style.display = 'block';
+      status.innerText = "⏳ Analisando cupom... Aguarde.";
+      itensDiv.innerHTML = "";
+
+      Tesseract.recognize(file, 'por').then(({ data: { text } }) => {
+        status.innerText = "✅ Itens detectados. Escolha o mercado acima antes de confirmar!";
+        const regexPreco = /(\d+[,\.]\d{2})/g;
+        const regexEan = /(\d{13})/g;
+        text.split('\n').forEach(linha => {
+          const pMatch = linha.match(regexPreco);
+          const eMatch = linha.match(regexEan);
+          if (pMatch) {
+            const preco = pMatch[0].replace(',', '.');
+            const ean = eMatch ? eMatch[0] : "S/ Código";
+            const div = document.createElement('div');
+            div.className = 'item-ocr';
+            div.innerHTML = `<div><b>R$ ${preco}</b><br><small>${linha.substring(0,20)}</small></div><button class="btn-confirm" onclick="salvarOcrItem('${ean}', '${preco}')">Confirmar</button>`;
+            itensDiv.appendChild(div);
+          }
+        });
+      });
+    }
+
+    async function salvarOcrItem(ean, preco) {
+      const mercadoId = document.getElementById('selectMercado').value;
+      if (!mercadoId) return alert("⚠️ Selecione o Mercado no menu acima primeiro!");
+
+      const { error } = await supabaseClient.from('precos').insert([{
+        produto_id: ean === "S/ Código" ? null : ean,
+        valor: parseFloat(preco),
+        supermercado_id: parseInt(mercadoId),
+        data_coleta: new Date().toISOString()
+      }]);
+      if(!error) alert("✅ Item do cupom salvo!");
     }
 
     async function cadastrarLoja() {
-      const nome = prompt("Novo Supermercado:");
+      const nome = prompt("Nome do Supermercado:");
       if (nome) { await supabaseClient.from('supermercados').insert([{ nome: nome }]); carregarMercados(); }
     }
   </script>
