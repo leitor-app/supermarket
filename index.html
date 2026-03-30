@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.1.1 - Estável</title>
+    <title>Smart Scanner v10.1.2 - Câmera Estável</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -49,7 +49,7 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.1.1</div>
+        <div class="version-tag">VERSÃO 10.1.2</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços na sua Planilha</p>
         
@@ -148,15 +148,40 @@
 
         function iniciarScanner() {
             html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-                document.getElementById('barcodeInput').value = text;
-                pararScanner();
-                buscarHibrida();
-            }).catch(() => alert("Erro ao abrir câmera."));
+            
+            // CONFIGURAÇÃO DE CÂMERA MELHORADA:
+            // Aumentado FPS para 20 e QRBOX mais largo para códigos de barra
+            const config = { 
+                fps: 20, 
+                qrbox: { width: 300, height: 150 },
+                aspectRatio: 1.0
+            };
+
+            // Pequeno delay para a câmera focar antes de aceitar leituras
+            setTimeout(() => {
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (text) => {
+                        // VALIDAÇÃO: Ignora leituras "fantasmas" menores que 8 dígitos
+                        if (text.length >= 8) {
+                            document.getElementById('barcodeInput').value = text;
+                            pararScanner();
+                            if (navigator.vibrate) navigator.vibrate(100);
+                            buscarHibrida();
+                        }
+                    }
+                ).catch(() => alert("Erro ao abrir câmera. Verifique as permissões."));
+            }, 500);
         }
 
         function pararScanner() {
-            if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; });
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => { 
+                    document.getElementById('reader').style.display = 'none'; 
+                    html5QrCode = null;
+                });
+            }
         }
 
         async function buscarHibrida() {
@@ -171,7 +196,7 @@
             } else if (!isNaN(termo) && termo.length >= 8) {
                 buscarNaWeb(termo);
             } else {
-                alert("Produto não cadastrado.");
+                alert("Produto não cadastrado no seu banco.");
             }
         }
 
@@ -182,7 +207,7 @@
                 if (json.status === 1) {
                     exibirResultados({ id: ean, nome: json.product.product_name || "Desconhecido", foto_url: json.product.image_url || "" }, true);
                 } else {
-                    alert("Produto não encontrado na Web.");
+                    alert("Produto não encontrado na Web (OpenFoodFacts). Verifique se o código está legível.");
                 }
             } catch (e) { alert("Erro ao conectar na Web."); }
         }
@@ -196,7 +221,7 @@
             document.getElementById('resFoto').src = produto.foto_url || "https://via.placeholder.com/50";
             
             const listaDiv = document.getElementById('listaPrecos');
-            listaDiv.innerHTML = ehNovo ? "<p style='color:#fbbf24; font-size:0.7em;'>✨ Encontrado na Web! Complete para salvar.</p>" : "";
+            listaDiv.innerHTML = ehNovo ? "<p style='color:#fbbf24; font-size:0.7em; font-weight:bold;'>✨ Novo via Web! Salve para adicionar ao banco.</p>" : "";
             
             if (!ehNovo && produto.precos) {
                 const u = {}; produto.precos.forEach(p => { if(!u[p.supermercado_id] || new Date(p.data_coleta) > new Date(u[p.supermercado_id].data_coleta)) u[p.supermercado_id] = p; });
@@ -215,12 +240,12 @@
             const p = document.getElementById('inputPreco').value;
             const m = document.getElementById('selectMercado').value;
             const n = document.getElementById('resNome').innerText;
-            if (!p || !m) return alert("Preencha preço e loja!");
+            if (!p || !m) return alert("Selecione o mercado e informe o preço!");
 
             await supabaseClient.from('produtos').upsert({ id: eanAtual, nome: n, foto_url: fotoUrlTemporaria });
             await supabaseClient.from('precos').insert([{ produto_id: eanAtual, valor: parseFloat(p), supermercado_id: parseInt(m), data_coleta: new Date().toISOString() }]);
             
-            alert("✅ Salvo!");
+            alert("✅ Sucesso! Preço registrado.");
             buscarHibrida();
         }
 
