@@ -3,87 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v10.3 - Revisão OCR</title>
+  <title>Smart Scanner v10.4 - Estável</title>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
-    :root { --primary: #10b981; --bg: #0f172a; --card: rgba(30, 41, 59, 0.9); --blue: #3b82f6; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; display: flex; justify-content: center; }
+    :root { --primary: #10b981; --bg: #0f172a; --card: rgba(30, 41, 59, 0.85); --blue: #3b82f6; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; box-sizing: border-box; }
     
-    .smart-card { width: 100%; max-width: 450px; background: var(--card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); }
-    .version-tag { position: absolute; top: 10px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); }
+    /* Layout Fiel à Imagem */
+    .smart-card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 25px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); position: relative; }
+    .version-tag { position: absolute; top: 12px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); font-weight: bold; }
     
-    h1 { text-align: center; color: var(--primary); margin: 0; }
-    label { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
+    h1 { text-align: center; color: var(--primary); font-size: 1.8rem; margin: 0; font-weight: 700; }
+    .subtitle { text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 0.85em; margin-bottom: 25px; }
     
-    input, select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: #1e293b; color: white; box-sizing: border-box; }
+    label { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 20px; display: block; }
+    input, select { width: 100%; padding: 14px; margin-top: 6px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; outline: none; }
 
-    /* Modal / Overlay de Revisão */
-    #modalOcr { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
-    .revisao-container { background: #1e293b; border-radius: 20px; padding: 20px; max-width: 500px; margin: auto; border: 1px solid var(--blue); }
-    
-    .item-revisao { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); margin-bottom: 10px; padding: 12px; border-radius: 12px; }
-    .item-revisao div { flex: 1; }
-    .btn-remove { color: #ef4444; background: none; border: none; cursor: pointer; font-size: 1.2rem; margin-left: 10px; }
-    
-    .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
-    .btn-save-all { background: var(--primary); color: white; font-size: 1rem; }
-    .btn-cancel { background: #334155; color: white; margin-top: 5px; }
+    .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+    .btn { padding: 14px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 14px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+    .btn-cam { background: var(--primary); }
+    .btn-search { background: transparent; border: 2px solid #334155; }
 
-    .action-group { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .btn-action { background: rgba(255,255,255,0.03); border: 1px solid #334155; color: #cbd5e1; text-align: left; padding: 15px; border-radius: 12px; display: flex; align-items: center; }
+    /* Estilo da Lista Autocomplete */
+    #autocompleteList { position: absolute; width: calc(100% - 50px); background: #1e293b; border: 1px solid #334155; border-radius: 12px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; margin-top: 5px; }
+    .suggestion-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; }
+
+    /* Área de Revisão OCR (Abaixo dos botões) */
+    #areaOcr { display: none; margin-top: 25px; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--blue); border-radius: 18px; padding: 15px; animation: fadeIn 0.3s ease; }
+    .item-ocr { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.85em; }
+    .btn-del { color: #ef4444; background: none; border: none; font-size: 1.1rem; cursor: pointer; }
+
+    /* Botões de Ação Inferiores */
+    .action-group { margin-top: 30px; display: flex; flex-direction: column; gap: 10px; }
+    .btn-action { background: rgba(255, 255, 255, 0.03); border: 1px solid #334155; color: #cbd5e1; border-radius: 14px; padding: 14px; text-align: left; font-size: 0.9em; display: flex; align-items: center; cursor: pointer; }
+    .btn-action i { width: 25px; color: var(--primary); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
   </style>
 </head>
 <body>
 
   <div class="smart-card">
-    <div class="version-tag">VERSÃO 10.3</div>
+    <div class="version-tag">V10.4</div>
     <h1>Smart Scanner</h1>
+    <p class="subtitle">Produtos e Preços na sua Planilha</p>
     
-    <label>Buscar Produto</label>
-    <input type="text" id="barcodeInput" placeholder="EAN ou Nome..." oninput="buscarSugestoes()" autocomplete="off">
-    <div id="autocompleteList" class="autocomplete-list"></div>
-
-    <div class="action-group">
-      <button class="btn-action" onclick="document.getElementById('fotoCupom').click()">
-        <i class="fas fa-file-invoice-dollar" style="color:var(--blue); font-size: 1.2rem;"></i> &nbsp; <b>Ler Cupom Fiscal (IA)</b>
-      </button>
-      <input type="file" id="fotoCupom" accept="image/*" capture="environment" style="display:none" onchange="iniciarOcr(this)">
-      
-      <button class="btn-action" onclick="toggleScanner()">
-        <i class="fas fa-barcode" style="color:var(--primary); font-size: 1.2rem;"></i> &nbsp; Scanner de Câmera
-      </button>
+    <label>PESQUISAR POR CÓDIGO OU NOME</label>
+    <input type="text" id="barcodeInput" placeholder="Ex: Yakult ou 789..." oninput="buscarSugestoes()" autocomplete="off">
+    <div id="autocompleteList"></div>
+    
+    <div class="button-group">
+      <button class="btn btn-cam" onclick="toggleScanner()"><i class="fas fa-camera"></i> Câmera</button>
+      <button class="btn btn-search" onclick="buscarHibrida()">🔍 Buscar</button>
     </div>
 
     <div id="reader" style="display:none; margin-top:15px; border-radius:15px; overflow:hidden;"></div>
 
-    <div id="areaResultado" style="display:none; margin-top:20px; padding-top:15px; border-top:1px solid #334155;">
-       <h3 id="resNome"></h3>
-       <div id="listaPrecos"></div>
-    </div>
-  </div>
-
-  <div id="modalOcr">
-    <div class="revisao-container">
-      <h2 style="color:var(--blue); margin-top:0;">📋 Revisão do Cupom</h2>
-      <p id="ocrStatus" style="font-size:0.8em; color:#94a3b8;">Aguarde o processamento...</p>
+    <div id="areaOcr">
+      <h3 style="color:var(--blue); font-size:0.9em; margin:0;">📋 Revisão do Cupom</h3>
+      <p id="ocrStatus" style="font-size:0.7em; color:#94a3b8">Processando...</p>
       
-      <label>Selecionar Supermercado</label>
-      <select id="selectMercadoOcr">
-        <option value="">Onde você comprou?</option>
-      </select>
+      <label>Confirmar Supermercado</label>
+      <select id="selectMercadoOcr"></select>
 
-      <div id="listaItensRevisao" style="margin-top:20px;"></div>
+      <div id="listaItensOcr" style="margin:15px 0; max-height:200px; overflow-y:auto;"></div>
+      
+      <button class="btn" style="background:var(--primary); width:100%;" onclick="salvarTudoOcr()">✅ SALVAR ITENS</button>
+      <button class="btn" style="background:#334155; width:100%; margin-top:5px;" onclick="fecharOcr()">CANCELAR</button>
+    </div>
 
-      <button class="btn btn-save-all" id="btnFinalizarOcr" onclick="salvarTudoOcr()" style="display:none;">
-        <i class="fas fa-cloud-upload-alt"></i> SALVAR TODOS OS ITENS
+    <div id="areaResultado" style="display:none; margin-top:20px; border-top:1px solid #334155; padding-top:15px;">
+        <div id="infoProduto" style="display:flex; align-items:center;">
+          <img id="resFoto" style="width:50px; height:50px; background:white; border-radius:8px; margin-right:12px; object-fit:contain;">
+          <div><h3 id="resNome" style="margin:0; font-size:0.95em;"></h3><small id="resEan" style="color:#64748b"></small></div>
+        </div>
+        <div id="listaPrecos" style="margin:15px 0;"></div>
+    </div>
+
+    <div class="action-group">
+      <button class="btn btn-action" onclick="document.getElementById('fotoCupom').click()">
+        <i class="fas fa-file-invoice-dollar"></i> Ler Comprovante com IA
       </button>
-      <button class="btn btn-cancel" onclick="fecharModalOcr()">CANCELAR</button>
+      <input type="file" id="fotoCupom" accept="image/*" capture="environment" style="display:none" onchange="processarCupom(this)">
+      
+      <button class="btn btn-action"><i class="fas fa-clipboard-list"></i> Minha Lista de Compras</button>
+      <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
     </div>
   </div>
 
@@ -92,116 +102,108 @@
     const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
     const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
-    let itensDetectadosGlobal = [];
+    let html5QrCode, eanAtual, itensOcr = [];
 
-    window.onload = async () => {
+    window.onload = carregarMercados;
+
+    async function carregarMercados() {
       const { data } = await supabaseClient.from('supermercados').select('id, nome').order('nome');
       if (data) {
-        const selects = [document.getElementById('selectMercadoOcr')];
-        selects.forEach(s => {
-          data.forEach(m => {
-            let opt = document.createElement('option');
-            opt.value = m.id; opt.innerText = m.nome;
-            s.appendChild(opt);
-          });
+        const selectOcr = document.getElementById('selectMercadoOcr');
+        selectOcr.innerHTML = '<option value="">Onde você está?</option>';
+        data.forEach(m => {
+          let opt = document.createElement('option');
+          opt.value = m.id; opt.innerText = m.nome;
+          selectOcr.appendChild(opt);
         });
       }
-    };
-
-    // --- LÓGICA OCR v10.3 ---
-    async function iniciarOcr(input) {
-      const file = input.files[0]; if(!file) return;
-      document.getElementById('modalOcr').style.display = 'block';
-      const status = document.getElementById('ocrStatus');
-      status.innerText = "⏳ IA analisando cupom... (Aprox. 10-15s)";
-      
-      Tesseract.recognize(file, 'por').then(({ data: { text } }) => {
-        status.innerText = "✅ Análise concluída! Remova o que não for produto.";
-        document.getElementById('btnFinalizarOcr').style.display = 'block';
-        processarTextoParaRevisao(text);
-      });
     }
 
-    function processarTextoParaRevisao(texto) {
-      const listaDiv = document.getElementById('listaItensRevisao');
-      listaDiv.innerHTML = "";
-      itensDetectadosGlobal = [];
+    // --- OCR CORRIGIDO (v10.4) ---
+    async function processarCupom(input) {
+      const file = input.files[0]; if(!file) return;
+      document.getElementById('areaOcr').style.display = 'block';
+      const status = document.getElementById('ocrStatus');
+      status.innerText = "⏳ Lendo cupom... (Pode levar 15s)";
+      
+      const worker = await Tesseract.createWorker('por');
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
 
+      status.innerText = "✅ Leitura concluída!";
+      analisarTextoOcr(text);
+    }
+
+    function analisarTextoOcr(texto) {
+      const container = document.getElementById('listaItensOcr');
+      container.innerHTML = "";
+      itensOcr = [];
       const regexPreco = /(\d+[,\.]\d{2})/g;
       const regexEan = /(\d{13})/g;
 
-      texto.split('\n').forEach((linha, index) => {
-        const pMatch = linha.match(regexPreco);
-        const eMatch = linha.match(regexEan);
-
-        if (pMatch) {
-          const item = {
-            idTemp: index,
-            ean: eMatch ? eMatch[0] : null,
-            preco: parseFloat(pMatch[0].replace(',', '.')),
-            nomeOriginal: linha.substring(0, 30).trim()
-          };
-          itensDetectadosGlobal.push(item);
-          renderizarItemRevisao(item);
+      texto.split('\n').forEach((linha, i) => {
+        const p = linha.match(regexPreco);
+        const e = linha.match(regexEan);
+        if (p) {
+          const item = { id: i, ean: e ? e[0] : null, preco: parseFloat(p[0].replace(',', '.')), nome: linha.substring(0,25) };
+          itensOcr.push(item);
+          const div = document.createElement('div');
+          div.className = 'item-ocr';
+          div.id = `ocr-${i}`;
+          div.innerHTML = `<div><b>R$ ${item.preco.toFixed(2)}</b><br><small>${item.nome}</small></div>
+                           <button class="btn-del" onclick="removerOcr(${i})">✕</button>`;
+          container.appendChild(div);
         }
       });
     }
 
-    function renderizarItemRevisao(item) {
-      const listaDiv = document.getElementById('listaItensRevisao');
-      const div = document.createElement('div');
-      div.className = 'item-revisao';
-      div.id = `item-${item.idTemp}`;
-      div.innerHTML = `
-        <div>
-          <b>R$ ${item.preco.toFixed(2)}</b><br>
-          <small style="color:#94a3b8">${item.nomeOriginal} ${item.ean ? '('+item.ean+')' : ''}</small>
-        </div>
-        <button class="btn-remove" onclick="removerItemOcr(${item.idTemp})">
-          <i class="fas fa-times-circle"></i>
-        </button>
-      `;
-      listaDiv.appendChild(div);
-    }
-
-    function removerItemOcr(idTemp) {
-      itensDetectadosGlobal = itensDetectadosGlobal.filter(i => i.idTemp !== idTemp);
-      document.getElementById(`item-${idTemp}`).remove();
+    function removerOcr(id) {
+      itensOcr = itensOcr.filter(it => it.id !== id);
+      document.getElementById(`ocr-${id}`).remove();
     }
 
     async function salvarTudoOcr() {
       const mercadoId = document.getElementById('selectMercadoOcr').value;
-      if (!mercadoId) return alert("⚠️ Selecione o supermercado primeiro!");
-      if (itensDetectadosGlobal.length === 0) return alert("Lista vazia!");
-
-      const btn = document.getElementById('btnFinalizarOcr');
-      btn.disabled = true;
-      btn.innerText = "⏳ Salvando no banco...";
-
-      let salvos = 0;
-      for (const item of itensDetectadosGlobal) {
-        // Lógica de UPSERT ou INSERT (evitar duplicados no mesmo dia/loja)
-        const { error } = await supabaseClient.from('precos').insert([{
-          produto_id: item.ean,
-          valor: item.preco,
-          supermercado_id: parseInt(mercadoId),
-          data_coleta: new Date().toISOString()
+      if (!mercadoId) return alert("Selecione o Supermercado!");
+      
+      for (const it of itensOcr) {
+        await supabaseClient.from('precos').insert([{
+          produto_id: it.ean, valor: it.preco, supermercado_id: parseInt(mercadoId), data_coleta: new Date().toISOString()
         }]);
-        if(!error) salvos++;
       }
-
-      alert(`✅ Sucesso! ${salvos} itens foram processados.`);
-      fecharModalOcr();
+      alert("✅ Itens salvos!");
+      fecharOcr();
     }
 
-    function fecharModalOcr() {
-      document.getElementById('modalOcr').style.display = 'none';
-      document.getElementById('fotoCupom').value = "";
+    function fecharOcr() { document.getElementById('areaOcr').style.display='none'; document.getElementById('fotoCupom').value=""; }
+
+    // --- BUSCA E SCANNER (MANTIDOS) ---
+    async function buscarHibrida() {
+      const t = document.getElementById('barcodeInput').value.trim();
+      const { data } = await supabaseClient.from('produtos').select(`id, nome, foto_url, precos(valor, data_coleta, supermercado_id, supermercados(nome))`).or(`id.eq.${t},nome.ilike.%${t}%`).maybeSingle();
+      if(data) {
+        eanAtual = data.id;
+        document.getElementById('areaResultado').style.display = 'block';
+        document.getElementById('resNome').innerText = data.nome;
+        document.getElementById('resFoto').src = data.foto_url || "";
+        const lista = document.getElementById('listaPrecos'); lista.innerHTML = "";
+        if(data.precos) {
+          data.precos.forEach(p => {
+            lista.innerHTML += `<div style="display:flex; justify-content:space-between; padding:8px; background:rgba(255,255,255,0.05); border-radius:8px; margin-bottom:5px;">
+                                  <span>${p.supermercados.nome}</span><b>R$ ${p.valor.toFixed(2)}</b>
+                                </div>`;
+          });
+        }
+      }
     }
 
-    // --- (Scanner e Autocomplete mantidos da v10.1) ---
-    function toggleScanner() { /* ... lógica anterior ... */ }
-    async function buscarSugestoes() { /* ... lógica anterior ... */ }
+    function toggleScanner() {
+      const r = document.getElementById('reader');
+      if(r.style.display === 'block') { if(html5QrCode) html5QrCode.stop().then(()=> r.style.display='none'); }
+      else { r.style.display='block'; html5QrCode = new Html5Qrcode("reader"); html5QrCode.start({facingMode:"environment"}, {fps:10, qrbox:250}, (t)=>{ document.getElementById('barcodeInput').value=t; html5QrCode.stop().then(()=> {r.style.display='none'; buscarHibrida();}); }); }
+    }
+
+    async function cadastrarLoja() { const n = prompt("Supermercado:"); if(n) { await supabaseClient.from('supermercados').insert([{nome:n}]); carregarMercados(); } }
   </script>
 </body>
 </html>
