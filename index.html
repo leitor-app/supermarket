@@ -1,100 +1,11 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Scanner v10.0 - Scanner Real</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-    .smart-card { width: 100%; max-width: 420px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); position: relative; }
-    
-    .version-tag { position: absolute; top: 10px; right: 20px; font-size: 0.6em; color: rgba(255,255,255,0.3); font-weight: bold; }
-    h1 { text-align: center; color: #10b981; font-size: 1.6rem; margin: 0; font-weight: 700; }
-    .subtitle { text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 0.8em; margin-bottom: 15px; }
-    
-    label { font-size: 0.7em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
-    input, select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; color: white; box-sizing: border-box; font-size: 1em; }
-
-    .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-    .btn { padding: 12px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 12px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-    .btn-cam { background: #10b981; }
-    .btn-search { background: transparent; border: 2px solid #334155; }
-
-    /* --- ÁREA DO SCANNER --- */
-    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; display: none; border: 2px solid #10b981; }
-
-    #areaResultado { display: none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
-    .product-header { display: flex; align-items: center; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px; }
-    .product-header img { width: 50px; height: 50px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; }
-    
-    .scroll-precos { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
-    .card-preco { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .card-preco.mais-barato { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.08); }
-    .valor-loja { color: #10b981; font-weight: 800; }
-
-    .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(16, 185, 129, 0.2); }
-    .btn-save { width: 100%; background: #10b981; margin-top: 10px; }
-
-    .action-group { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
-    .btn-action { background: rgba(255, 255, 255, 0.02); border: 1px solid #334155; color: #cbd5e1; border-radius: 12px; padding: 10px 15px; text-align: left; font-size: 0.85em; display: flex; align-items: center; }
-    .btn-action i { width: 25px; color: #10b981; }
-  </style>
-</head>
-<body>
-
-  <div class="smart-card">
-    <div class="version-tag">VERSÃO 10.0</div>
-    <h1>Smart Scanner</h1>
-    <p class="subtitle">Produtos e Preços na sua Planilha</p>
-    
-    <label>Pesquisar por Código ou Nome</label>
-    <input type="text" id="barcodeInput" placeholder="Escaneie ou digite...">
-    
-    <div class="button-group">
-      <button class="btn btn-cam" onclick="toggleScanner()"><i class="fas fa-camera"></i> Câmera</button>
-      <button class="btn btn-search" onclick="buscarHibrida()">🔍 Buscar</button>
-    </div>
-
-    <div id="reader"></div>
-
-    <div id="areaResultado">
-      <div class="product-header">
-        <img id="resFoto" src="">
-        <div>
-          <h3 id="resNome" style="margin:0; font-size:0.9em;"></h3>
-          <small id="resEan" style="color:#64748b; font-size:0.7em;"></small>
-        </div>
-      </div>
-
-      <div id="listaPrecos" class="scroll-precos"></div>
-
-      <div class="price-form">
-        <input type="number" id="inputPreco" step="0.01" placeholder="Novo Preço R$ 0.00">
-        <select id="selectMercado" style="margin-top: 10px;">
-          <option value="">Selecione o Mercado...</option>
-        </select>
-        <button class="btn btn-save" onclick="salvarNovoPreco()">💾 ATUALIZAR PREÇO</button>
-      </div>
-    </div>
-
-    <div class="action-group">
-      <button class="btn btn-action"><i class="fas fa-file-invoice-dollar"></i> Ler Comprovante com IA</button>
-      <button class="btn btn-action"><i class="fas fa-clipboard-list"></i> Minha Lista de Compras</button>
-      <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
-    </div>
-  </div>
-
-  <script>
+<script>
     const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co';
     const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
     const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
     let html5QrCode;
     let eanAtual = "";
+    let fotoUrlTemporaria = ""; // Guarda a foto da web se precisar salvar
 
     window.onload = carregarMercados;
 
@@ -111,72 +22,90 @@
       }
     }
 
-    // --- LÓGICA DO SCANNER REAL ---
     function toggleScanner() {
       const readerDiv = document.getElementById('reader');
-      if (readerDiv.style.display === 'block') {
-        pararScanner();
-      } else {
-        readerDiv.style.display = 'block';
-        iniciarScanner();
-      }
+      if (readerDiv.style.display === 'block') { pararScanner(); } 
+      else { readerDiv.style.display = 'block'; iniciarScanner(); }
     }
 
     function iniciarScanner() {
       html5QrCode = new Html5Qrcode("reader");
-      const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-
-      html5QrCode.start(
-        { facingMode: "environment" }, 
-        config,
+      html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, 
         (decodedText) => {
-          // Quando ler o código com sucesso:
           document.getElementById('barcodeInput').value = decodedText;
           pararScanner();
-          // Bipar ou vibrar (opcional)
           if (navigator.vibrate) navigator.vibrate(100);
-          buscarHibrida(); // Dispara a busca automaticamente
+          buscarHibrida();
         }
-      ).catch(err => {
-        console.error("Erro câmera:", err);
-        alert("Erro ao abrir câmera. Verifique as permissões.");
-      });
+      ).catch(err => alert("Erro ao abrir câmera."));
     }
 
     function pararScanner() {
       if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          document.getElementById('reader').style.display = 'none';
-        });
+        html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; });
       }
     }
 
-    // --- BUSCA E EXIBIÇÃO (v9.3) ---
+    // --- NOVA BUSCA HÍBRIDA (SUPABASE + WEB) ---
     async function buscarHibrida() {
       const termo = document.getElementById('barcodeInput').value.trim();
       if (!termo) return;
 
-      const { data } = await supabaseClient
+      // 1. Tenta no SEU Banco Primeiro
+      const { data, error } = await supabaseClient
         .from('produtos')
         .select(`id, nome, foto_url, precos (valor, data_coleta, supermercado_id, supermercados (nome))`)
         .or(`id.eq.${termo},nome.ilike.%${termo}%`)
         .maybeSingle();
 
-      if (data) exibirResultados(data);
-      else alert("Produto não cadastrado.");
+      if (data) {
+        exibirResultados(data, false);
+      } else {
+        // 2. Se for código numérico e não achou no banco, tenta na Web
+        if (!isNaN(termo) && termo.length >= 8) {
+          buscarNaWeb(termo);
+        } else {
+          alert("Produto não encontrado no banco.");
+        }
+      }
     }
 
-    function exibirResultados(produto) {
+    async function buscarNaWeb(ean) {
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`);
+        const json = await res.json();
+
+        if (json.status === 1) {
+          const produtoWeb = {
+            id: ean,
+            nome: json.product.product_name || "Produto Desconhecido",
+            foto_url: json.product.image_url || ""
+          };
+          // Exibe como sugestão para cadastro
+          exibirResultados(produtoWeb, true);
+        } else {
+          alert("Produto não encontrado nem no banco, nem na internet.");
+        }
+      } catch (e) {
+        alert("Erro ao consultar a base web.");
+      }
+    }
+
+    function exibirResultados(produto, ehNovo) {
       eanAtual = produto.id;
+      fotoUrlTemporaria = produto.foto_url;
+      
       document.getElementById('areaResultado').style.display = 'block';
       document.getElementById('resNome').innerText = produto.nome;
       document.getElementById('resEan').innerText = "EAN: " + produto.id;
-      document.getElementById('resFoto').src = produto.foto_url || "";
+      document.getElementById('resFoto').src = produto.foto_url || "https://via.placeholder.com/50";
       
       const listaDiv = document.getElementById('listaPrecos');
       listaDiv.innerHTML = "";
       
-      if (produto.precos && produto.precos.length > 0) {
+      if (ehNovo) {
+        listaDiv.innerHTML = "<p style='color:#fbbf24; font-size:0.8em; margin:0;'>✨ Sugestão da Web encontrada! Complete os dados abaixo para salvar no seu banco.</p>";
+      } else if (produto.precos && produto.precos.length > 0) {
         const ultimos = {};
         produto.precos.forEach(p => {
           if (!ultimos[p.supermercado_id] || new Date(p.data_coleta) > new Date(ultimos[p.supermercado_id].data_coleta)) {
@@ -200,14 +129,31 @@
     async function salvarNovoPreco() {
       const preco = document.getElementById('inputPreco').value;
       const mercadoId = document.getElementById('selectMercado').value;
+      const nomeProd = document.getElementById('resNome').innerText;
+
       if (!preco || !mercadoId) return alert("Preencha preço e loja!");
 
-      await supabaseClient.from('precos').insert([{
-        produto_id: eanAtual, valor: parseFloat(preco),
-        supermercado_id: parseInt(mercadoId), data_coleta: new Date().toISOString()
+      // 1. Garantir que o produto existe na tabela 'produtos' (Upsert)
+      const { error: errorProd } = await supabaseClient
+        .from('produtos')
+        .upsert({ id: eanAtual, nome: nomeProd, foto_url: fotoUrlTemporaria });
+
+      if (errorProd) return alert("Erro ao criar produto: " + errorProd.message);
+
+      // 2. Salvar o Preço
+      const { error: errorPreco } = await supabaseClient.from('precos').insert([{
+        produto_id: eanAtual, 
+        valor: parseFloat(preco),
+        supermercado_id: parseInt(mercadoId), 
+        data_coleta: new Date().toISOString()
       }]);
-      alert("✅ Atualizado!");
-      buscarHibrida();
+
+      if (errorPreco) {
+        alert("Erro ao salvar preço: " + errorPreco.message);
+      } else {
+        alert("✅ Salvo com sucesso!");
+        buscarHibrida();
+      }
     }
 
     async function cadastrarLoja() {
@@ -218,5 +164,3 @@
       }
     }
   </script>
-</body>
-</html>
