@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.2 - IA & Lista</title>
+    <title>Smart Scanner v10.3 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -172,7 +172,7 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.2</div>
+        <div class="version-tag">VERSÃO 10.3</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
@@ -294,22 +294,44 @@
             try {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST',
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: base64 } }] }] })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        contents: [{ 
+                            parts: [
+                                { text: prompt }, 
+                                { inlineData: { mimeType: "image/jpeg", data: base64 } } 
+                            ] 
+                        }] 
+                    })
                 });
+
+                if (!res.ok) {
+                    const errJson = await res.json();
+                    throw new Error(errJson.error?.message || "Erro na requisição da API");
+                }
+
                 const json = await res.json();
+                
+                if (!json.candidates || !json.candidates[0].content) {
+                     throw new Error("A IA não retornou o formato esperado");
+                }
+
                 const textoIA = json.candidates[0].content.parts[0].text.replace(/```json/g, "").replace(/```/g, "").trim();
                 const dados = JSON.parse(textoIA);
 
-                itensOcrGlobal = dados.itens;
-                status.innerText = `✅ Detectamos ${dados.itens.length} produtos.`;
+                itensOcrGlobal = dados.itens || [];
+                status.innerText = `✅ Detectamos ${itensOcrGlobal.length} produtos.`;
                 renderizarRevisaoOcr();
-            } catch (e) { status.innerText = "❌ Erro na IA: " + e.message; }
+            } catch (e) { 
+                status.innerText = "❌ Erro na IA: " + e.message; 
+            }
         }
 
         function renderizarRevisaoOcr() {
             const div = document.getElementById('listaItensOcr');
             div.innerHTML = "";
             itensOcrGlobal.forEach((it, i) => {
+                if(!it) return; // Previne erros se deletado
                 div.innerHTML += `<div class="item-ocr" id="ia-item-${i}">
                     <div><b>R$ ${it.preco.toFixed(2)}</b><br><small>${it.nome}</small></div>
                     <button style="color:var(--error); background:none; border:none; cursor:pointer;" onclick="removerItemOcr(${i})">✕</button>
