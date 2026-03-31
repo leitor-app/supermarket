@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.4 - IA & Lista</title>
+    <title>Smart Scanner v10.3.1 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -172,7 +172,7 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.4</div>
+        <div class="version-tag">VERSÃO 10.3.1</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
@@ -193,7 +193,11 @@
         <!-- Resultados (Supabase ou Web) -->
         <div id="areaResultado">
             <div class="product-header">
-                <img id="resFoto" src="">
+                <div style="position:relative; width:50px; height:50px; margin-right:12px; cursor:pointer;" onclick="document.getElementById('inputFotoUpdate').click()">
+                    <img id="resFoto" src="" style="width:100%; height:100%; border-radius:8px; object-fit:contain; background:white; margin:0;" title="Toque para mudar a foto">
+                    <div style="position:absolute; bottom:-4px; right:-4px; background:var(--primary); color:white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:11px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);"><i class="fas fa-camera"></i></div>
+                </div>
+                <input type="file" id="inputFotoUpdate" accept="image/*" capture="environment" style="display:none" onchange="processarFotoUpdate(this)">
                 <div>
                     <h3 id="resNome" style="margin:0; font-size:0.9em;"></h3>
                     <small id="resEan" style="color:#64748b; font-size:0.7em;"></small>
@@ -426,7 +430,8 @@
             document.getElementById('areaFormularioPreco').style.display = 'block';
             document.getElementById('btnListaRapida').style.display = 'block';
             document.getElementById('resNome').innerText = p.nome;
-            document.getElementById('resFoto').src = p.foto_url || "https://via.placeholder.com/50";
+            const fallbackImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%2364748b' d='M448 80c8.8 0 16 7.2 16 16V415.8l-5-6.5-136-176c-4.5-5.9-11.6-9.3-19-9.3s-14.4 3.4-19 9.3L202 340.7l-30.5-42.7C167 291.7 159.8 288 152 288s-15 3.7-19.5 10.1l-80 112L48 416.3l0-.3V96c0-8.8 7.2-16 16-16H448zM64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 192a48 48 0 1 0 0-96 48 48 0 1 0 0 96z'/></svg>";
+            document.getElementById('resFoto').src = p.foto_url || fallbackImg;
             const divPrecos = document.getElementById('listaPrecos');
             divPrecos.innerHTML = ehWeb ? "<p style='color:var(--warning); font-size:0.7em;'>✨ Detectado via Web</p>" : "";
             if (!ehWeb && p.precos) {
@@ -451,7 +456,7 @@
             try {
                 let nFinal = ehProdutoNovo ? document.getElementById('novoNome').value : document.getElementById('resNome').innerText;
                 let fFinal = fotoUrlTemporaria;
-                if (ehProdutoNovo && arquivoFotoParaUpload) {
+                if (arquivoFotoParaUpload) {
                     const nomeArq = `${eanAtual}_${Date.now()}.jpg`;
                     await supabaseClient.storage.from('fotos-produtos').upload(nomeArq, arquivoFotoParaUpload);
                     fFinal = supabaseClient.storage.from('fotos-produtos').getPublicUrl(nomeArq).data.publicUrl;
@@ -474,6 +479,15 @@
                 document.getElementById('previewFoto').style.display = 'block';
                 comprimirParaUpload(e.target.result, f.name);
             }; r.readAsDataURL(f);
+        }
+
+        function processarFotoUpdate(input) {
+            const f = input.files[0]; if (!f) return;
+            const r = new FileReader(); r.onload = (e) => {
+                document.getElementById('resFoto').src = e.target.result;
+                comprimirParaUpload(e.target.result, f.name);
+            }; r.readAsDataURL(f);
+            alert("📷 Câmera capturada!\n\nAperte no botão verde 'SALVAR NO BANCO' para atualizar ela definitivamente no sistema!");
         }
 
         function comprimirParaUpload(base64, nome) {
