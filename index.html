@@ -302,8 +302,8 @@
                 });
 
                 if (!res.ok) {
-                    const errJson = await res.json();
-                    throw new Error(errJson.error || "Erro na Edge Function / Gemini Server");
+                    const rawError = await res.text();
+                    throw new Error("HTTP " + res.status + " | " + rawError);
                 }
 
                 const json = await res.json();
