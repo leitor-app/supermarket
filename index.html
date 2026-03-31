@@ -432,9 +432,14 @@
             if (!ehWeb && p.precos) {
                 const u = {}; p.precos.forEach(it => { if(!u[it.supermercado_id] || new Date(it.data_coleta) > new Date(u[it.supermercado_id].data_coleta)) u[it.supermercado_id] = it; });
                 Object.values(u).sort((a,b) => a.valor - b.valor).forEach(it => {
-                    divPrecos.innerHTML += `<div class="card-preco"><span>${it.supermercados.nome}</span><b>R$ ${it.valor.toFixed(2)}</b></div>`;
+                    divPrecos.innerHTML += `<div class="card-preco" style="cursor:pointer; border: 1px solid rgba(59, 130, 246, 0.3);" onclick="preencherDados(${it.valor}, ${it.supermercado_id})" title="Clique para copiar este preço"><span>${it.supermercados.nome}</span><div style="display:flex; align-items:center;"><b>R$ ${it.valor.toFixed(2)}</b><i class="fas fa-hand-pointer" style="margin-left: 10px; color: #3b82f6; font-size: 0.8em;"></i></div></div>`;
                 });
             }
+        }
+
+        function preencherDados(valor, mercadoId) {
+            document.getElementById('inputPreco').value = valor;
+            document.getElementById('selectMercado').value = mercadoId;
         }
 
         // 4. Salvamento e Compressão (Estável v10.1.5)
