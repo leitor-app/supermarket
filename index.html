@@ -246,11 +246,21 @@
     <!-- MODAL: MINHA LISTA DE COMPRAS -->
     <div id="modalLista">
         <h1 style="color:var(--primary)">Minha Lista</h1>
-        <p style="text-align:center; color:#94a3b8; font-size:0.8em;">Toque para marcar como comprado</p>
+        <p style="text-align:center; color:#94a3b8; font-size:0.8em;">Controle de carrinho offline</p>
         
-        <div id="containerLista" style="margin-top:20px;"></div>
+        <div id="containerLista" style="margin-top:20px; padding-bottom: 120px;"></div>
         
-        <button class="btn" style="background:#334155; width:100%; margin-top:20px;" onclick="fecharListaCompras()">VOLTAR</button>
+        <!-- Rodapé Fixado da Lista -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg); border-top: 1px solid rgba(255,255,255,0.1); padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; z-index: 1001;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem;">
+                <b>Total Estimado:</b>
+                <b style="color:var(--primary)" id="totalLista">R$ 0.00</b>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" style="background:var(--error); flex: 1;" onclick="limparLista()"><i class="fas fa-trash"></i> Limpar</button>
+                <button class="btn" style="background:#334155; flex: 1;" onclick="fecharListaCompras()">Voltar</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -263,7 +273,7 @@
         // --- ESTADOS ---
         let html5QrCode, eanAtual, timeoutBusca, fotoUrlTemporaria = "";
         let arquivoFotoParaUpload = null, ehProdutoNovo = false, itensOcrGlobal = [];
-        let listaComprasLocal = []; // Armazena a lista na sessão (pode ser enviada pro banco depois)
+        let listaComprasLocal = JSON.parse(localStorage.getItem('minhas_compras_v10')) || [];
 
         window.onload = carregarMercados;
 
@@ -493,7 +503,7 @@
         function ativarModoNovo(ean) { resetarInterface(); ehProdutoNovo = true; eanAtual = ean; document.getElementById('areaNovoCadastro').style.display='block'; document.getElementById('areaFormularioPreco').style.display='block'; }
         async function cadastrarLoja() { const n = prompt("Supermercado:"); if (n) { await supabaseClient.from('supermercados').insert([{ nome: n }]); carregarMercados(); } }
 
-        // 5. Lista de Compras
+        // 5. Lista de Compras Completa
         function abrirListaCompras() {
             document.getElementById('modalLista').style.display = 'block';
             renderLista();
@@ -501,29 +511,82 @@
 
         function fecharListaCompras() { document.getElementById('modalLista').style.display = 'none'; }
 
+        function salvarCarrinho() {
+            localStorage.setItem('minhas_compras_v10', JSON.stringify(listaComprasLocal));
+            renderLista();
+        }
+
         function adicionarPrecoALista() {
             const nome = document.getElementById('resNome').innerText;
-            const preco = document.getElementById('inputPreco').value;
+            const preco = parseFloat(document.getElementById('inputPreco').value);
             if(!preco) return alert("Digite o preço primeiro!");
-            listaComprasLocal.push({ nome: nome, preco: parseFloat(preco), check: false });
+            
+            // Verifica se já existe para só somar a qtd
+            const index = listaComprasLocal.findIndex(it => it.nome === nome && it.preco === preco);
+            if(index >= 0) {
+                listaComprasLocal[index].qtd += 1;
+            } else {
+                listaComprasLocal.push({ nome: nome, preco: preco, qtd: 1, check: false });
+            }
+            
+            salvarCarrinho();
             alert("🛒 Adicionado à lista!");
+        }
+
+        function alterarQtdLista(index, delta) {
+            listaComprasLocal[index].qtd += delta;
+            if(listaComprasLocal[index].qtd <= 0) listaComprasLocal[index].qtd = 1;
+            salvarCarrinho();
+        }
+
+        function removerDaLista(index) {
+            if(confirm("Remover este item do carrinho?")) {
+                listaComprasLocal.splice(index, 1);
+                salvarCarrinho();
+            }
+        }
+
+        function limparLista() {
+            if(confirm("Tem certeza que deseja esvaziar TODA a lista de compras?")) {
+                listaComprasLocal = [];
+                salvarCarrinho();
+            }
+        }
+
+        function toggleCheck(i) {
+            listaComprasLocal[i].check = !listaComprasLocal[i].check;
+            salvarCarrinho();
         }
 
         function renderLista() {
             const cont = document.getElementById('containerLista');
             cont.innerHTML = "";
+            let somaTotal = 0;
+
             listaComprasLocal.forEach((it, i) => {
-                cont.innerHTML += `<div class="card-preco" style="margin-bottom:10px; opacity: ${it.check ? 0.4 : 1}" onclick="toggleCheck(${i})">
-                    <span>${it.nome}</span>
-                    <b style="color:var(--primary)">R$ ${it.preco.toFixed(2)}</b>
+                const subtotal = it.preco * it.qtd;
+                somaTotal += subtotal; // Soma sempre, independente do Check
+                
+                cont.innerHTML += `
+                <div class="card-preco" style="margin-bottom:10px; flex-direction: column; align-items: stretch; border-left: 4px solid ${it.check ? 'var(--primary)' : '#334155'}; opacity: ${it.check ? 0.6 : 1};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;" onclick="toggleCheck(${i})">
+                        <span style="${it.check ? 'text-decoration: line-through' : ''}; flex: 1;">${it.nome}</span>
+                        <b style="color:var(--primary); margin-left: 10px;">R$ ${subtotal.toFixed(2)}</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <small style="color:#94a3b8">Unit: R$ ${it.preco.toFixed(2)}</small>
+                        <div style="display:flex; gap: 8px; align-items: center;">
+                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, -1)">-</button>
+                            <b style="width: 20px; text-align: center;">${it.qtd}</b>
+                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, 1)">+</button>
+                            <button style="background:var(--error); border:none; color:white; padding:5px 12px; border-radius:5px; margin-left:10px; cursor:pointer;" onclick="removerDaLista(${i})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
                 </div>`;
             });
-            if(listaComprasLocal.length === 0) cont.innerHTML = "<p style='text-align:center;'>Lista vazia.</p>";
-        }
 
-        function toggleCheck(i) {
-            listaComprasLocal[i].check = !listaComprasLocal[i].check;
-            renderLista();
+            if(listaComprasLocal.length === 0) cont.innerHTML = "<p style='text-align:center; color: #94a3b8;'>Sua lista está vazia.</p>";
+            document.getElementById('totalLista').innerText = "R$ " + somaTotal.toFixed(2);
         }
 
         async function buscarSugestoes() {
