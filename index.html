@@ -444,7 +444,11 @@
                 await supabaseClient.from('produtos').upsert({ id: eanAtual, nome: nFinal, foto_url: fFinal });
                 await supabaseClient.from('precos').insert([{ produto_id: eanAtual, valor: parseFloat(p), supermercado_id: parseInt(m), data_coleta: new Date().toISOString() }]);
                 alert("✅ Sucesso!"); buscarHibrida();
-            } catch (err) { alert("Erro: " + err.message); btn.disabled = false; btn.innerText = "💾 SALVAR"; }
+            } catch (err) { 
+                alert("Erro: " + err.message); 
+            } finally {
+                btn.disabled = false; btn.innerText = "💾 SALVAR NO BANCO";
+            }
         }
 
         // --- AUXILIARES ---
