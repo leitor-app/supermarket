@@ -290,20 +290,27 @@
                     nomeFinal = document.getElementById('novoNome').value.trim();
                     if (!nomeFinal) throw new Error("O nome do produto novo é obrigatório!");
 
-                    // 1. Upload da Foto (se houver)
-                    if (arquivoFotoParaUpload) {
-                        btn.innerHTML = "📸 Fazendo upload da foto...";
-                        const nomeArquivo = `${eanAtual}_${Date.now()}.jpg`;
-                        const { error: errorUpload } = await supabaseClient.storage
-                            .from('fotos_produtos') // NOME DO SEU BUCKET NO SUPABASE
-                            .upload(nomeArquivo, arquivoFotoParaUpload);
+                   // --- TRECHO CORRIGIDO DENTRO DA FUNÇÃO salvarTudo ---
 
-                        if (errorUpload) throw new Error("Erro upload foto: " + errorUpload.message);
+// 1. Upload da Foto (se houver)
+if (arquivoFotoParaUpload) {
+    btn.innerHTML = "📸 Fazendo upload da foto...";
+    const nomeArquivo = `${eanAtual}_${Date.now()}.jpg`;
+    
+    // ALTERADO DE 'fotos_produtos' PARA 'fotos-produtos'
+    const { error: errorUpload } = await supabaseClient.storage
+        .from('fotos-produtos') 
+        .upload(nomeArquivo, arquivoFotoParaUpload);
 
-                        // Pega a URL pública
-                        const { data: dataUrl } = supabaseClient.storage.from('fotos_produtos').getPublicUrl(nomeArquivo);
-                        fotoFinal = dataUrl.publicUrl;
-                    }
+    if (errorUpload) throw new Error("Erro upload foto: " + errorUpload.message);
+
+    // ALTERADO TAMBÉM AQUI PARA PEGAR A URL
+    const { data: dataUrl } = supabaseClient.storage
+        .from('fotos-produtos')
+        .getPublicUrl(nomeArquivo);
+        
+    fotoFinal = dataUrl.publicUrl;
+}
 
                     // 2. Cadastrar Produto na tabela 'produtos'
                     btn.innerHTML = "📝 Cadastrando produto...";
