@@ -257,7 +257,14 @@
         // --- CONFIGURAÇÃO ---
         const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co';
         const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
-        const GEMINI_KEY = "AIzaSyDOFBZuqlBWF5DKIIbd_i7t5raLfLE05RY"; // Sua chave do Google Cloud
+        
+        // Pega a chave salva no celular ou pede pela primeira vez
+        let GEMINI_KEY = localStorage.getItem('minha_chave_gemini');
+        if (!GEMINI_KEY || GEMINI_KEY.includes('AIzaSy')) { // Se for a chave velha vazada ou não existir
+            GEMINI_KEY = prompt("Sua chave do Gemini antiga vazou e foi bloqueada. Por favor, gere uma nova no Google AI Studio e cole aqui (ela ficará salva no seu celular):");
+            if (GEMINI_KEY) localStorage.setItem('minha_chave_gemini', GEMINI_KEY);
+        }
+
         const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
         // --- ESTADOS ---
