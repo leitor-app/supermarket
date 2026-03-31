@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Scanner v10.4 - IA & Lista</title>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Scanner v10.3 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -172,7 +178,627 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.3</div>
+        <div class="version-tag">VERSÃO 10.4</div>
+        <h1>Smart Scanner</h1>
+        <p class="subtitle">Produtos e Preços Inteligentes</p>
+        
+        <!-- Campo de Busca com Autocomplete -->
+        <label>Pesquisar por Código ou Nome</label>
+        <input type="text" id="barcodeInput" placeholder="Escaneie ou digite..." oninput="buscarSugestoes()" autocomplete="off">
+        <div id="autocompleteList" class="autocomplete-list"></div>
+        
+        <!-- Botões de Câmera e Busca Direta -->
+        <div class="button-group">
+            <button class="btn btn-cam" onclick="toggleScanner()"><i class="fas fa-camera"></i> Câmera</button>
+            <button class="btn btn-search" onclick="buscarHibrida()">🔍 Buscar</button>
+        </div>
+
+        <!-- Onde o Scanner de Vídeo aparece -->
+        <div id="reader"></div>
+
+        <!-- Resultados (Supabase ou Web) -->
+        <div id="areaResultado">
+            <div class="product-header">
+                <img id="resFoto" src="">
+                <div>
+                    <h3 id="resNome" style="margin:0; font-size:0.9em;"></h3>
+                    <small id="resEan" style="color:#64748b; font-size:0.7em;"></small>
+                </div>
+            </div>
+            <div id="listaPrecos" class="scroll-precos"></div>
+        </div>
+
+        <!-- Caso o produto não exista (v10.1.5) -->
+        <div id="areaNovoCadastro">
+            <div style="text-align:center; margin-bottom:10px;"><span style="background:var(--warning); color:#000; font-size:0.7em; font-weight:bold; padding:3px 8px; border-radius:20px;">NOVO PRODUTO</span></div>
+            <label>Nome do Produto</label>
+            <input type="text" id="novoNome" placeholder="Ex: Café Melitta 500g">
+            <label>Foto do Produto</label>
+            <button class="btn" style="background:#334155; width:100%;" onclick="document.getElementById('inputArquivoFoto').click()"><i class="fas fa-camera"></i> TIRAR FOTO</button>
+            <input type="file" id="inputArquivoFoto" accept="image/*" capture="environment" style="display:none" onchange="processarEPreviewFoto(this)">
+            <img id="previewFoto" src="">
+        </div>
+
+        <!-- Cadastro de Preço (v10.1.5) -->
+        <div class="price-form" id="areaFormularioPreco" style="display:none;">
+            <label>Preço Atual R$</label>
+            <input type="number" id="inputPreco" step="0.01" placeholder="0.00">
+            <select id="selectMercado"></select>
+            <button class="btn btn-cam" id="btnFinalizar" style="width:100%; margin-top:10px;" onclick="salvarTudo()">💾 SALVAR NO BANCO</button>
+            <button class="btn" id="btnListaRapida" style="background:var(--blue); width:100%; margin-top:5px; display:none;" onclick="adicionarPrecoALista()">🛒 ADICIONAR À LISTA</button>
+        </div>
+
+        <!-- Revisão de Cupom Lido por IA -->
+        <div id="areaOcr">
+            <h3 style="color:var(--blue); font-size:0.9em; margin:0;">📋 Revisão do Cupom (IA)</h3>
+            <p id="ocrStatus" style="font-size:0.7em; color:#94a3b8">Analisando imagem...</p>
+            <label>Confirmar Supermercado</label>
+            <select id="selectMercadoOcr"></select>
+            <div id="listaItensOcr" style="margin:15px 0; max-height:200px; overflow-y:auto;"></div>
+            <button class="btn btn-cam" style="width:100%;" onclick="salvarLoteOcr()">✅ SALVAR TUDO</button>
+            <button class="btn" style="background:#334155; width:100%; margin-top:5px;" onclick="fecharOcr()">CANCELAR</button>
+        </div>
+
+        <!-- Menu de Ações Inferiores -->
+        <div class="action-group">
+            <button class="btn btn-action" onclick="document.getElementById('fotoCupom').click()"><i class="fas fa-file-invoice-dollar" style="color:var(--blue)"></i> Ler Comprovante com IA</button>
+            <input type="file" id="fotoCupom" accept="image/*" capture="environment" style="display:none" onchange="processarCupomIA(this)">
+            
+            <button class="btn btn-action" onclick="abrirListaCompras()"><i class="fas fa-clipboard-list"></i> Minha Lista de Compras</button>
+            <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MINHA LISTA DE COMPRAS -->
+    <div id="modalLista">
+        <h1 style="color:var(--primary)">Minha Lista</h1>
+        <p style="text-align:center; color:#94a3b8; font-size:0.8em;">Controle de carrinho offline</p>
+        
+        <div id="containerLista" style="margin-top:20px; padding-bottom: 120px;"></div>
+        
+        <!-- Rodapé Fixado da Lista -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg); border-top: 1px solid rgba(255,255,255,0.1); padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; z-index: 1001;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem;">
+                <b>Total Estimado:</b>
+                <b style="color:var(--primary)" id="totalLista">R$ 0.00</b>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" style="background:var(--error); flex: 1;" onclick="limparLista()"><i class="fas fa-trash"></i> Limpar</button>
+                <button class="btn" style="background:#334155; flex: 1;" onclick="fecharListaCompras()">Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co';
+        const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
+        
+        const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
+
+        // --- ESTADOS ---
+        let html5QrCode, eanAtual, timeoutBusca, fotoUrlTemporaria = "";
+        let arquivoFotoParaUpload = null, ehProdutoNovo = false, itensOcrGlobal = [];
+        let listaComprasLocal = JSON.parse(localStorage.getItem('minhas_compras_v10')) || [];
+
+        window.onload = carregarMercados;
+
+        // 1. Carrega supermercados do banco
+        async function carregarMercados() {
+            const { data } = await supabaseClient.from('supermercados').select('id, nome').order('nome');
+            const s1 = document.getElementById('selectMercado');
+            const s2 = document.getElementById('selectMercadoOcr');
+            [s1, s2].forEach(sel => {
+                if (sel) {
+                    sel.innerHTML = '<option value="">Selecione o Supermercado...</option>';
+                    if (data) data.forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.nome}</option>`; });
+                }
+            });
+        }
+
+        // 2. IA Gemini: Processar Cupom
+        async function processarCupomIA(input) {
+            const file = input.files[0]; if (!file) return;
+            document.getElementById('areaOcr').style.display = 'block';
+            const status = document.getElementById('ocrStatus');
+            status.innerText = "⏳ IA analisando cupom... (15s)";
+
+            // Comprime antes de enviar
+            const base64 = await comprimirParaIA(file);
+
+            try {
+                // A requisição vai para a sua EDGE FUNCTION SEGURA no Supabase!
+                const res = await fetch(`https://vnpoanckjsjggqqtlpxk.supabase.co/functions/v1/rapid-endpoint`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${CHAVE_ANON}` 
+                    },
+                    body: JSON.stringify({ image: base64 })
+                });
+
+                if (!res.ok) {
+                    const rawError = await res.text();
+                    throw new Error("HTTP " + res.status + " | " + rawError);
+                }
+
+                const json = await res.json();
+                
+                if (!json.candidates || !json.candidates[0].content) {
+                     throw new Error("A IA não retornou o formato esperado");
+                }
+
+                const textoIA = json.candidates[0].content.parts[0].text.replace(/```json/g, "").replace(/```/g, "").trim();
+                const dados = JSON.parse(textoIA);
+
+                itensOcrGlobal = dados.itens || [];
+                status.innerText = `✅ Detectamos ${itensOcrGlobal.length} produtos.`;
+                renderizarRevisaoOcr();
+            } catch (e) { 
+                status.innerText = "❌ Erro na IA: " + e.message; 
+            }
+        }
+
+        function renderizarRevisaoOcr() {
+            const div = document.getElementById('listaItensOcr');
+            div.innerHTML = "";
+            itensOcrGlobal.forEach((it, i) => {
+                if(!it) return; // Previne erros se deletado
+                div.innerHTML += `<div class="item-ocr" id="ia-item-${i}">
+                    <div><b>R$ ${it.preco.toFixed(2)}</b><br><small>${it.nome}</small></div>
+                    <button style="color:var(--error); background:none; border:none; cursor:pointer;" onclick="removerItemOcr(${i})">✕</button>
+                </div>`;
+            });
+        }
+
+        function removerItemOcr(i) {
+            itensOcrGlobal[i] = null;
+            document.getElementById(`ia-item-${i}`).style.opacity = "0.3";
+        }
+
+        async function salvarLoteOcr() {
+            const mercadoId = document.getElementById('selectMercadoOcr').value;
+            if (!mercadoId) return alert("Escolha o mercado!");
+            
+            for (const it of itensOcrGlobal) {
+                if (!it) continue;
+                if (it.ean) await supabaseClient.from('produtos').upsert({ id: it.ean, nome: it.nome });
+                await supabaseClient.from('precos').insert([{ 
+                    produto_id: it.ean || null, 
+                    valor: it.preco, 
+                    supermercado_id: parseInt(mercadoId), 
+                    data_coleta: new Date().toISOString() 
+                }]);
+            }
+            alert("✅ Lote de preços salvo!");
+            fecharOcr();
+        }
+
+        function fecharOcr() { document.getElementById('areaOcr').style.display='none'; }
+
+        // 3. Scanner e Busca (Estável v10.1.5)
+        function toggleScanner() {
+            const rd = document.getElementById('reader');
+            if (rd.style.display === 'block') { if(html5QrCode) html5QrCode.stop().then(() => rd.style.display = 'none'); }
+            else { 
+                rd.style.display = 'block'; 
+                
+                // Restringindo os formatos de código de barras ajuda a ignorar lixo
+                html5QrCode = new Html5Qrcode("reader", { 
+                    formatsToSupport: [ 
+                        Html5QrcodeSupportedFormats.EAN_13, 
+                        Html5QrcodeSupportedFormats.EAN_8, 
+                        Html5QrcodeSupportedFormats.UPC_A, 
+                        Html5QrcodeSupportedFormats.UPC_E 
+                    ] 
+                });
+
+                html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 280, height: 130 } }, (text) => {
+                    // Padrão do Mundo para caixas de supermercado: 8, 12, 13 ou 14 números.
+                    const ehApenasNumero = /^\d+$/.test(text);
+                    const tamanhoCorreto = [8, 12, 13, 14].includes(text.length);
+
+                    if (ehApenasNumero && tamanhoCorreto) {
+                        document.getElementById('barcodeInput').value = text;
+                        html5QrCode.stop().then(() => { rd.style.display = 'none'; buscarHibrida(); });
+                    }
+                });
+            }
+        }
+
+        async function buscarHibrida() {
+            const t = document.getElementById('barcodeInput').value.trim();
+            if (!t) return;
+            resetarInterface();
+            document.getElementById('autocompleteList').style.display = 'none';
+            const { data } = await supabaseClient.from('produtos').select(`id, nome, foto_url, precos(valor, data_coleta, supermercado_id, supermercados(nome))`).or(`id.eq.${t},nome.ilike.%${t}%`).maybeSingle();
+            if (data) exibirResultados(data, false);
+            else if (!isNaN(t) && t.length >= 8) buscarNaWeb(t);
+            else alert("Produto não encontrado.");
+        }
+
+        async function buscarNaWeb(ean) {
+            try {
+                const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`);
+                const json = await res.json();
+                if (json.status === 1) exibirResultados({ id: ean, nome: json.product.product_name || "Desconhecido", foto_url: json.product.image_url || "" }, true);
+                else ativarModoNovo(ean);
+            } catch (e) { alert("Erro ao consultar Web."); }
+        }
+
+        function exibirResultados(p, ehWeb) {
+            eanAtual = p.id; fotoUrlTemporaria = p.foto_url;
+            document.getElementById('areaResultado').style.display = 'block';
+            document.getElementById('areaFormularioPreco').style.display = 'block';
+            document.getElementById('btnListaRapida').style.display = 'block';
+            document.getElementById('resNome').innerText = p.nome;
+            document.getElementById('resFoto').src = p.foto_url || "https://via.placeholder.com/50";
+            const divPrecos = document.getElementById('listaPrecos');
+            divPrecos.innerHTML = ehWeb ? "<p style='color:var(--warning); font-size:0.7em;'>✨ Detectado via Web</p>" : "";
+            if (!ehWeb && p.precos) {
+                const u = {}; p.precos.forEach(it => { if(!u[it.supermercado_id] || new Date(it.data_coleta) > new Date(u[it.supermercado_id].data_coleta)) u[it.supermercado_id] = it; });
+                Object.values(u).sort((a,b) => a.valor - b.valor).forEach(it => {
+                    divPrecos.innerHTML += `<div class="card-preco" style="cursor:pointer; border: 1px solid rgba(59, 130, 246, 0.3);" onclick="preencherDados(${it.valor}, ${it.supermercado_id})" title="Clique para copiar este preço"><span>${it.supermercados.nome}</span><div style="display:flex; align-items:center;"><b>R$ ${it.valor.toFixed(2)}</b><i class="fas fa-hand-pointer" style="margin-left: 10px; color: #3b82f6; font-size: 0.8em;"></i></div></div>`;
+                });
+            }
+        }
+
+        function preencherDados(valor, mercadoId) {
+            document.getElementById('inputPreco').value = valor;
+            document.getElementById('selectMercado').value = mercadoId;
+        }
+
+        // 4. Salvamento e Compressão (Estável v10.1.5)
+        async function salvarTudo() {
+            const p = document.getElementById('inputPreco').value;
+            const m = document.getElementById('selectMercado').value;
+            if (!p || !m) return alert("Preencha preço e loja!");
+            const btn = document.getElementById('btnFinalizar'); btn.disabled = true; btn.innerText = "⏳ Gravando...";
+            try {
+                let nFinal = ehProdutoNovo ? document.getElementById('novoNome').value : document.getElementById('resNome').innerText;
+                let fFinal = fotoUrlTemporaria;
+                if (ehProdutoNovo && arquivoFotoParaUpload) {
+                    const nomeArq = `${eanAtual}_${Date.now()}.jpg`;
+                    await supabaseClient.storage.from('fotos-produtos').upload(nomeArq, arquivoFotoParaUpload);
+                    fFinal = supabaseClient.storage.from('fotos-produtos').getPublicUrl(nomeArq).data.publicUrl;
+                }
+                await supabaseClient.from('produtos').upsert({ id: eanAtual, nome: nFinal, foto_url: fFinal });
+                await supabaseClient.from('precos').insert([{ produto_id: eanAtual, valor: parseFloat(p), supermercado_id: parseInt(m), data_coleta: new Date().toISOString() }]);
+                alert("✅ Sucesso!"); buscarHibrida();
+            } catch (err) { 
+                alert("Erro: " + err.message); 
+            } finally {
+                btn.disabled = false; btn.innerText = "💾 SALVAR NO BANCO";
+            }
+        }
+
+        // --- AUXILIARES ---
+        function processarEPreviewFoto(input) {
+            const f = input.files[0]; if (!f) return;
+            const r = new FileReader(); r.onload = (e) => {
+                document.getElementById('previewFoto').src = e.target.result;
+                document.getElementById('previewFoto').style.display = 'block';
+                comprimirParaUpload(e.target.result, f.name);
+            }; r.readAsDataURL(f);
+        }
+
+        function comprimirParaUpload(base64, nome) {
+            const img = new Image(); img.src = base64;
+            img.onload = () => {
+                const cv = document.createElement('canvas'); const M = 640;
+                let w = img.width, h = img.height;
+                if (w > M) { h *= (M/w); w = M; }
+                cv.width = w; cv.height = h;
+                cv.getContext('2d').drawImage(img, 0, 0, w, h);
+                cv.toBlob((blob) => { arquivoFotoParaUpload = new File([blob], nome, { type: 'image/jpeg' }); }, 'image/jpeg', 0.7);
+            }
+        }
+
+        function comprimirParaIA(file) {
+            return new Promise((resolve) => {
+                const r = new FileReader(); r.onload = (e) => {
+                    const img = new Image(); img.src = e.target.result;
+                    img.onload = () => {
+                        const cv = document.createElement('canvas'); const M = 1000;
+                        let w = img.width, h = img.height;
+                        if (w > h && w > M) { h *= (M/w); w = M; } else if (h > M) { w *= (M/h); h = M; }
+                        cv.width = w; cv.height = h;
+                        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(cv.toDataURL("image/jpeg", 0.7).split(",")[1]);
+                    };
+                }; r.readAsDataURL(file);
+            });
+        }
+
+        function resetarInterface() { 
+            ehProdutoNovo = false; 
+            arquivoFotoParaUpload = null; 
+            document.getElementById('areaResultado').style.display='none'; 
+            document.getElementById('areaNovoCadastro').style.display='none'; 
+            document.getElementById('areaFormularioPreco').style.display='none'; 
+            document.getElementById('previewFoto').style.display='none'; 
+            document.getElementById('btnListaRapida').style.display='none'; 
+            document.getElementById('inputPreco').value = '';
+            document.getElementById('novoNome').value = '';
+        }
+        function ativarModoNovo(ean) { resetarInterface(); ehProdutoNovo = true; eanAtual = ean; document.getElementById('areaNovoCadastro').style.display='block'; document.getElementById('areaFormularioPreco').style.display='block'; }
+        async function cadastrarLoja() { const n = prompt("Supermercado:"); if (n) { await supabaseClient.from('supermercados').insert([{ nome: n }]); carregarMercados(); } }
+
+        // 5. Lista de Compras Completa
+        function abrirListaCompras() {
+            document.getElementById('modalLista').style.display = 'block';
+            renderLista();
+        }
+
+        function fecharListaCompras() { document.getElementById('modalLista').style.display = 'none'; }
+
+        function salvarCarrinho() {
+            localStorage.setItem('minhas_compras_v10', JSON.stringify(listaComprasLocal));
+            renderLista();
+        }
+
+        function adicionarPrecoALista() {
+            const nome = document.getElementById('resNome').innerText;
+            const preco = parseFloat(document.getElementById('inputPreco').value);
+            if(!preco) return alert("Digite o preço primeiro!");
+            
+            // Verifica se já existe para só somar a qtd
+            const index = listaComprasLocal.findIndex(it => it.nome === nome && it.preco === preco);
+            if(index >= 0) {
+                listaComprasLocal[index].qtd += 1;
+            } else {
+                listaComprasLocal.push({ nome: nome, preco: preco, qtd: 1, check: false });
+            }
+            
+            salvarCarrinho();
+            alert("🛒 Adicionado à lista!");
+            document.getElementById('barcodeInput').value = '';
+            resetarInterface();
+        }
+
+        function alterarQtdLista(index, delta) {
+            listaComprasLocal[index].qtd += delta;
+            if(listaComprasLocal[index].qtd <= 0) listaComprasLocal[index].qtd = 1;
+            salvarCarrinho();
+        }
+
+        function removerDaLista(index) {
+            if(confirm("Remover este item do carrinho?")) {
+                listaComprasLocal.splice(index, 1);
+                salvarCarrinho();
+            }
+        }
+
+        function limparLista() {
+            if(confirm("Tem certeza que deseja esvaziar TODA a lista de compras?")) {
+                listaComprasLocal = [];
+                salvarCarrinho();
+            }
+        }
+
+        function toggleCheck(i) {
+            listaComprasLocal[i].check = !listaComprasLocal[i].check;
+            salvarCarrinho();
+        }
+
+        function renderLista() {
+            const cont = document.getElementById('containerLista');
+            cont.innerHTML = "";
+            let somaTotal = 0;
+
+            listaComprasLocal.forEach((it, i) => {
+                const subtotal = it.preco * it.qtd;
+                somaTotal += subtotal; // Soma sempre, independente do Check
+                
+                cont.innerHTML += `
+                <div class="card-preco" style="margin-bottom:10px; flex-direction: column; align-items: stretch; border-left: 4px solid ${it.check ? 'var(--primary)' : '#334155'}; opacity: ${it.check ? 0.6 : 1};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;" onclick="toggleCheck(${i})">
+                        <span style="${it.check ? 'text-decoration: line-through' : ''}; flex: 1;">${it.nome}</span>
+                        <b style="color:var(--primary); margin-left: 10px;">R$ ${subtotal.toFixed(2)}</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <small style="color:#94a3b8">Unit: R$ ${it.preco.toFixed(2)}</small>
+                        <div style="display:flex; gap: 8px; align-items: center;">
+                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, -1)">-</button>
+                            <b style="width: 20px; text-align: center;">${it.qtd}</b>
+                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, 1)">+</button>
+                            <button style="background:var(--error); border:none; color:white; padding:5px 12px; border-radius:5px; margin-left:10px; cursor:pointer;" onclick="removerDaLista(${i})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            if(listaComprasLocal.length === 0) cont.innerHTML = "<p style='text-align:center; color: #94a3b8;'>Sua lista está vazia.</p>";
+            document.getElementById('totalLista').innerText = "R$ " + somaTotal.toFixed(2);
+        }
+
+        async function buscarSugestoes() {
+            const t = document.getElementById('barcodeInput').value.trim();
+            const l = document.getElementById('autocompleteList');
+            if (t.length < 2) { l.style.display = 'none'; resetarInterface(); return; }
+            clearTimeout(timeoutBusca);
+            timeoutBusca = setTimeout(async () => {
+                const { data } = await supabaseClient.from('produtos').select('id, nome, foto_url').ilike('nome', `%${t}%`).limit(5);
+                if (data && data.length > 0) {
+                    l.innerHTML = ""; l.style.display = 'block';
+                    data.forEach(p => {
+                        l.innerHTML += `<div class="suggestion-item" onclick="document.getElementById('barcodeInput').value='${p.id}'; buscarHibrida()"><img src="${p.foto_url || ''}"><div>${p.nome}</div></div>`;
+                    });
+                } else l.style.display = 'none';
+            }, 300);
+        }
+    </script>
+</body>
+</html>
+
+    <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <!-- Ícones e Fontes modernas -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Variáveis de Cores e Estilo */
+        :root { 
+            --primary: #10b981; 
+            --bg: #0f172a; 
+            --card: rgba(30, 41, 59, 0.85); 
+            --warning: #fbbf24; 
+            --error: #ef4444;
+            --blue: #3b82f6;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            display: flex; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+            box-sizing: border-box; 
+        }
+        
+        /* Container Principal com efeito Glassmorphism (vidro) */
+        .smart-card { 
+            width: 100%; 
+            max-width: 420px; 
+            background: var(--card); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 24px; 
+            padding: 20px; 
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); 
+            backdrop-filter: blur(15px); 
+            position: relative; 
+        }
+
+        .version-tag { 
+            position: absolute; 
+            top: 10px; 
+            right: 20px; 
+            font-size: 0.6em; 
+            color: rgba(255,255,255,0.3); 
+            font-weight: bold; 
+        }
+        
+        h1 { text-align: center; color: var(--primary); font-size: 1.6rem; margin: 0; font-weight: 700; }
+        .subtitle { text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 0.8em; margin-bottom: 15px; }
+        
+        label { font-size: 0.7em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
+        
+        /* Estilização de Inputs e Selects */
+        input, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 5px; 
+            border-radius: 10px; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            background: #0f172a; 
+            color: white; 
+            box-sizing: border-box; 
+            font-size: 1em; 
+            outline: none;
+        }
+
+        /* Botões */
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn { 
+            padding: 12px; 
+            border: none; 
+            color: white; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: 0.2s; 
+            font-size: 0.9em;
+        }
+        .btn-cam { background: var(--primary); }
+        .btn-search { background: transparent; border: 2px solid #334155; }
+        
+        /* Lista de Autocomplete (Sugestões enquanto digita) */
+        .autocomplete-list { 
+            position: absolute; 
+            width: calc(100% - 40px); 
+            background: #1e293b; 
+            border: 1px solid #334155; 
+            border-radius: 0 0 12px 12px; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            z-index: 100; 
+            display: none; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
+        }
+        .suggestion-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; }
+        .suggestion-item img { width: 30px; height: 30px; border-radius: 4px; margin-right: 10px; object-fit: contain; background: #fff; }
+
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; display: none; border: 2px solid var(--primary); }
+        
+        /* Estilos da Exibição de Resultados */
+        #areaResultado { display: none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+        .product-header { display: flex; align-items: center; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px; }
+        .product-header img { width: 50px; height: 50px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; }
+        
+        .scroll-precos { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .card-preco { 
+            background: rgba(255,255,255,0.05); 
+            padding: 10px; 
+            border-radius: 10px; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .card-preco.mais-barato { border-left: 4px solid var(--primary); background: rgba(16, 185, 129, 0.08); }
+        .valor-loja { color: var(--primary); font-weight: 800; }
+
+        /* Nova Área de Cadastro (v10.1.5) */
+        #areaNovoCadastro { display: none; border-top: 2px dashed var(--warning); padding-top: 15px; margin-top: 20px; }
+        #previewFoto { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--warning); display: none; margin: 10px auto; }
+        .price-form { background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(16, 185, 129, 0.2); margin-top: 10px; }
+
+        /* Estilo da Revisão de Cupom (IA) */
+        #areaOcr { display: none; margin-top: 20px; background: rgba(59, 130, 246, 0.05); border: 1px solid var(--blue); border-radius: 18px; padding: 15px; }
+        .item-ocr { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.85em; }
+
+        /* Botões de Ação Inferiores */
+        .action-group { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .btn-action { 
+            background: rgba(255, 255, 255, 0.02); 
+            border: 1px solid #334155; 
+            color: #cbd5e1; 
+            border-radius: 12px; 
+            padding: 10px 15px; 
+            text-align: left; 
+            font-size: 0.85em; 
+            display: flex; 
+            align-items: center; 
+            cursor: pointer; 
+        }
+        .btn-action i { width: 25px; color: var(--primary); }
+
+        /* Tela de Lista de Compras Overlay */
+        #modalLista {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="smart-card">
+        <div class="version-tag">VERSÃO 10.4</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
