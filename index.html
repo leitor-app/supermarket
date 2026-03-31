@@ -258,13 +258,6 @@
         const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co';
         const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
         
-        // Pega a chave salva no celular ou pede pela primeira vez
-        let GEMINI_KEY = localStorage.getItem('minha_chave_gemini');
-        if (!GEMINI_KEY || GEMINI_KEY.includes('AIzaSy')) { // Se for a chave velha vazada ou não existir
-            GEMINI_KEY = prompt("Sua chave do Gemini antiga vazou e foi bloqueada. Por favor, gere uma nova no Google AI Studio e cole aqui (ela ficará salva no seu celular):");
-            if (GEMINI_KEY) localStorage.setItem('minha_chave_gemini', GEMINI_KEY);
-        }
-
         const supabaseClient = supabase.createClient(URL_BANCO, CHAVE_ANON);
 
         // --- ESTADOS ---
@@ -296,25 +289,21 @@
 
             // Comprime antes de enviar
             const base64 = await comprimirParaIA(file);
-            const prompt = "Extraia o nome do mercado e itens. OBRIGATÓRIO: Preço UNITÁRIO (não o total) e CÓDIGO DE BARRAS numérico. Retorne APENAS JSON: {\"supermercado\": \"Nome\", \"itens\": [{\"nome\": \"Prod\", \"preco\": 5.99, \"ean\": \"789...\"}]}";
 
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                // A requisição vai para a sua EDGE FUNCTION SEGURA no Supabase!
+                const res = await fetch(`https://vnpoanckjsjggqqtlpxk.supabase.co/functions/v1/rapid-endpoint`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        contents: [{ 
-                            parts: [
-                                { text: prompt }, 
-                                { inlineData: { mimeType: "image/jpeg", data: base64 } } 
-                            ] 
-                        }] 
-                    })
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${CHAVE_ANON}` 
+                    },
+                    body: JSON.stringify({ image: base64 })
                 });
 
                 if (!res.ok) {
                     const errJson = await res.json();
-                    throw new Error(errJson.error?.message || "Erro na requisição da API");
+                    throw new Error(errJson.error || "Erro na Edge Function / Gemini Server");
                 }
 
                 const json = await res.json();
