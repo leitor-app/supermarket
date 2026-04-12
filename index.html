@@ -291,6 +291,7 @@
             <input type="file" id="fotoCupom" accept="image/*" capture="environment" style="display:none" onchange="processarCupomIA(this)">
             
             <button class="btn btn-action" onclick="abrirListaCompras()"><i class="fas fa-clipboard-list"></i> Minha Lista de Compras</button>
+            <button class="btn btn-action" onclick="abrirRanking()"><i class="fas fa-medal" style="color: var(--warning)"></i> Ranking de Categoria</button>
             <button class="btn btn-action" onclick="cadastrarLoja()"><i class="fas fa-store"></i> Cadastrar Supermercado</button>
         </div>
     </div>
@@ -314,6 +315,29 @@
             </div>
         </div>
     </div> <!-- Fechamento da Lista de Compras -->
+
+    <!-- MODAL: RANKING DE CATEGORIAS -->
+    <div id="modalRanking" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto;">
+        <h1 style="color:var(--warning)">Ranking</h1>
+        <p style="text-align:center; color:var(--text-muted); font-size:0.8em; margin-bottom: 20px;">Produtos mais baratos por categoria</p>
+        
+        <select id="selectCategoriaRanking" onchange="carregarRanking()" style="margin-bottom: 20px; font-weight: bold; background: var(--card);">
+            <option value="">Selecione uma Categoria...</option>
+            <option value="Bebidas">Bebidas (Refrigerante, Suco, Cerveja)</option>
+            <option value="Limpeza">Produtos de Limpeza</option>
+            <option value="Farinaceos">Cereais e Farináceos</option>
+            <option value="Carnes">Carnes e Açougue</option>
+            <option value="Laticinios">Leite e Laticínios</option>
+        </select>
+        
+        <div id="statusRanking" style="text-align: center; color: var(--text-muted); font-size: 0.9em; display: none; margin-bottom: 10px;">Buscando melhores preços...</div>
+        <div id="containerRanking" style="padding-bottom: 120px;"></div>
+        
+        <!-- Rodapé Fixado -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg); border-top: 1px solid var(--border); padding: 15px; box-sizing: border-box; display: flex; z-index: 1001;">
+            <button class="btn" style="background:var(--btn-bg); border: 1px solid var(--border); color: var(--text); flex: 1;" onclick="fecharRanking()">Voltar</button>
+        </div>
+    </div>
 
     <!-- Sistema de Modal Customizado -->
     <div id="uiModalOverlay">
@@ -789,6 +813,99 @@
                     });
                 } else l.style.display = 'none';
             }, 300);
+        }
+
+        // --- SISTEMA DE RANKING POR CATEGORIA (APP LOCAL) ---
+        const MAPA_CATEGORIAS = {
+            'Bebidas': ['coca', 'guaran', 'cerveja', 'suco', 'refrigerante', 'agua', 'água', 'fanta', 'pepsi', 'sprite', 'kuat', 'chopp'],
+            'Limpeza': ['sabao', 'sabão', 'detergente', 'amaciante', 'desinfetante', 'cloro', 'sanitária', 'esponja', 'limpador', 'omo', 'brilhante'],
+            'Farinaceos': ['arroz', 'feijao', 'feijão', 'macarr', 'farinha', 'trigo', 'fubá', 'aveia', 'miojo'],
+            'Carnes': ['carne', 'frango', 'bife', 'picanha', 'alcatra', 'coxão', 'coxao', 'suino', 'suíno', 'linguiça', 'salsicha', 'peixe', 'file'],
+            'Laticinios': ['leite', 'queijo', 'manteiga', 'requeij', 'iogurte', 'creme de leite', 'margarina', 'mussarela', 'prato', 'danone']
+        };
+
+        function abrirRanking() { 
+            document.getElementById('modalRanking').style.display = 'block'; 
+            document.getElementById('selectCategoriaRanking').value = '';
+            document.getElementById('containerRanking').innerHTML = '<p style="text-align:center; color: var(--text-muted); margin-top:40px;">Selecione uma categoria acima.</p>';
+        }
+        function fecharRanking() { document.getElementById('modalRanking').style.display = 'none'; }
+        
+        async function carregarRanking() {
+            const cat = document.getElementById('selectCategoriaRanking').value;
+            const cont = document.getElementById('containerRanking');
+            const status = document.getElementById('statusRanking');
+            cont.innerHTML = "";
+            if (!cat) return;
+            
+            status.style.display = 'block';
+            status.innerText = "⏳ Consultando e ordenando histórico...";
+            
+            try {
+                const chaves = MAPA_CATEGORIAS[cat];
+                // Criação do filtro local mapeando a categoria em strings ilike suportáveis pro banco
+                const queryOr = chaves.map(k => `nome.ilike.%${k}%`).join(',');
+                
+                const { data, error } = await supabaseClient.from('produtos')
+                    .select('nome, precos(valor, data_coleta, supermercados(nome))')
+                    .or(queryOr);
+                    
+                if (error) throw error;
+                
+                let ranking = [];
+                data.forEach(p => {
+                    if (!p.precos || p.precos.length === 0) return;
+                    let menorPrecoInfo = null;
+                    
+                    p.precos.forEach(pr => {
+                        if (!menorPrecoInfo || pr.valor < menorPrecoInfo.valor) {
+                            menorPrecoInfo = pr;
+                        }
+                    });
+                    
+                    if (menorPrecoInfo) {
+                        ranking.push({
+                            nome: p.nome,
+                            valor: menorPrecoInfo.valor,
+                            mercado: menorPrecoInfo.supermercados ? menorPrecoInfo.supermercados.nome : 'Desconhecido',
+                            data: menorPrecoInfo.data_coleta
+                        });
+                    }
+                });
+                
+                ranking.sort((a, b) => a.valor - b.valor);
+                status.style.display = 'none';
+                
+                if (ranking.length === 0) {
+                    cont.innerHTML = "<p style='text-align:center; color: var(--text-muted); margin-top:40px;'>Nenhum produto cadastrado para esta categoria.</p>";
+                    return;
+                }
+                
+                let html = "";
+                ranking.forEach((r, idx) => {
+                    let medalha = "";
+                    if (idx === 0) medalha = "🥇";
+                    else if (idx === 1) medalha = "🥈";
+                    else if (idx === 2) medalha = "🥉";
+                    else medalha = `<b style="font-size:0.7em;">${idx+1}º</b>`;
+                    
+                    html += `
+                    <div class="card-preco" style="margin-bottom:10px; display: flex; align-items: center; gap: 12px; border-left: 4px solid var(--warning);">
+                        <div style="font-size: 1.8rem; width: 35px; text-align: center; color: var(--primary);">${medalha}</div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; font-size: 0.95em; margin-bottom: 4px;">${r.nome}</div>
+                            <div style="font-size: 0.75em; color: var(--text-muted);"><i class="fas fa-store"></i> Em: ${r.mercado}</div>
+                        </div>
+                        <div style="font-weight: 900; color: var(--primary); font-size: 1.25em;">R$ ${r.valor.toFixed(2)}</div>
+                    </div>`;
+                });
+                cont.innerHTML = html;
+                
+            } catch (err) {
+                status.style.display = 'block';
+                status.innerText = "❌ Erro: " + err.message;
+                status.style.color = "var(--error)";
+            }
         }
     </script>
 </body>
