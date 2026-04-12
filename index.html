@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.3.1 - IA & Lista</title>
+    <title>Smart Scanner v10.3.2 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -172,7 +172,7 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.3.1</div>
+        <div class="version-tag">VERSÃO 10.3.2</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
@@ -233,7 +233,7 @@
             <label>Confirmar Supermercado</label>
             <select id="selectMercadoOcr"></select>
             <div id="listaItensOcr" style="margin:15px 0; max-height:200px; overflow-y:auto;"></div>
-            <button class="btn btn-cam" style="width:100%;" onclick="salvarLoteOcr()">✅ SALVAR TUDO</button>
+            <button id="btnSalvarOcr" class="btn btn-cam" style="width:100%;" onclick="salvarLoteOcr()">✅ SALVAR TUDO</button>
             <button class="btn" style="background:#334155; width:100%; margin-top:5px;" onclick="fecharOcr()">CANCELAR</button>
         </div>
 
@@ -351,8 +351,9 @@
             div.innerHTML = "";
             itensOcrGlobal.forEach((it, i) => {
                 if(!it) return; // Previne erros se deletado
+                let codExibido = it.ean || "";
                 div.innerHTML += `<div class="item-ocr" id="ia-item-${i}">
-                    <div><b>R$ ${it.preco.toFixed(2)}</b><br><small>${it.nome}</small></div>
+                    <div style="flex:1"><b>R$ ${it.preco.toFixed(2)}</b><br><small>${it.nome}</small><br><small style="color:var(--primary); font-size: 0.8em; font-weight: bold;">Cód: ${codExibido}</small></div>
                     <button style="color:var(--error); background:none; border:none; cursor:pointer;" onclick="removerItemOcr(${i})">✕</button>
                 </div>`;
             });
@@ -367,18 +368,35 @@
             const mercadoId = document.getElementById('selectMercadoOcr').value;
             if (!mercadoId) return alert("Escolha o mercado!");
             
-            for (const it of itensOcrGlobal) {
-                if (!it) continue;
-                if (it.ean) await supabaseClient.from('produtos').upsert({ id: it.ean, nome: it.nome });
-                await supabaseClient.from('precos').insert([{ 
-                    produto_id: it.ean || null, 
-                    valor: it.preco, 
-                    supermercado_id: parseInt(mercadoId), 
-                    data_coleta: new Date().toISOString() 
-                }]);
+            const btnSalvar = document.getElementById('btnSalvarOcr');
+            if (btnSalvar) {
+                btnSalvar.disabled = true;
+                btnSalvar.innerText = "⏳ SALVANDO NO BANCO...";
             }
-            alert("✅ Lote de preços salvo!");
-            fecharOcr();
+            document.getElementById('listaItensOcr').style.opacity = '0.5';
+            
+            try {
+                for (const it of itensOcrGlobal) {
+                    if (!it) continue;
+                    if (it.ean) await supabaseClient.from('produtos').upsert({ id: it.ean, nome: it.nome });
+                    await supabaseClient.from('precos').insert([{ 
+                        produto_id: it.ean || null, 
+                        valor: it.preco, 
+                        supermercado_id: parseInt(mercadoId), 
+                        data_coleta: new Date().toISOString() 
+                    }]);
+                }
+                alert("✅ Lote de preços salvo!");
+                fecharOcr();
+            } catch (err) {
+                alert("Erro ao salvar: " + err.message);
+            } finally {
+                if (btnSalvar) {
+                    btnSalvar.disabled = false;
+                    btnSalvar.innerText = "✅ SALVAR TUDO";
+                }
+                document.getElementById('listaItensOcr').style.opacity = '1';
+            }
         }
 
         function fecharOcr() { document.getElementById('areaOcr').style.display='none'; }
