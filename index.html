@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.3.3 - IA & Lista</title>
+    <title>Smart Scanner v10.3.4 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -22,12 +22,29 @@
             --warning: #fbbf24; 
             --error: #ef4444;
             --blue: #3b82f6;
+            --text: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.5);
+            --border: rgba(255, 255, 255, 0.1);
+            --input-bg: #0f172a;
+            --btn-bg: rgba(255, 255, 255, 0.02);
+            --list-bg: #1e293b;
+        }
+
+        body.light-theme {
+            --bg: #f8fafc;
+            --card: rgba(255, 255, 255, 0.95);
+            --text: #0f172a;
+            --text-muted: rgba(0, 0, 0, 0.5);
+            --border: rgba(0, 0, 0, 0.15);
+            --input-bg: #ffffff;
+            --btn-bg: #ffffff;
+            --list-bg: #ffffff;
         }
 
         body { 
             font-family: 'Inter', sans-serif; 
             background: var(--bg); 
-            color: white; 
+            color: var(--text); 
             display: flex; 
             justify-content: center; 
             min-height: 100vh; 
@@ -41,7 +58,7 @@
             width: 100%; 
             max-width: 420px; 
             background: var(--card); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border: 1px solid var(--border); 
             border-radius: 24px; 
             padding: 20px; 
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); 
@@ -58,29 +75,29 @@
             font-weight: bold; 
         }
         
-        h1 { text-align: center; color: var(--primary); font-size: 1.6rem; margin: 0; font-weight: 700; }
-        .subtitle { text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 0.8em; margin-bottom: 15px; }
+        h1 { text-align: center; color: var(--primary); font-size: 1.8rem; margin: 0; font-weight: 700; }
+        .subtitle { text-align: center; color: var(--text-muted); font-size: 0.85em; margin-bottom: 15px; }
         
-        label { font-size: 0.7em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
+        label { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-top: 15px; display: block; }
         
         /* Estilização de Inputs e Selects */
         input, select { 
             width: 100%; 
-            padding: 12px; 
+            padding: 14px; 
             margin-top: 5px; 
             border-radius: 10px; 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            background: #0f172a; 
-            color: white; 
+            border: 1px solid var(--border); 
+            background: var(--input-bg); 
+            color: var(--text); 
             box-sizing: border-box; 
-            font-size: 1em; 
+            font-size: 1.05em; 
             outline: none;
         }
 
         /* Botões */
         .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .btn { 
-            padding: 12px; 
+            padding: 14px; 
             border: none; 
             color: white; 
             font-weight: bold; 
@@ -90,17 +107,18 @@
             align-items: center; 
             justify-content: center; 
             transition: 0.2s; 
-            font-size: 0.9em;
+            font-size: 1em;
         }
         .btn-cam { background: var(--primary); }
-        .btn-search { background: transparent; border: 2px solid #334155; }
+        .btn-search { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        .theme-toggle { position: absolute; top: 12px; left: 20px; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); transition: 0.3s; }
         
         /* Lista de Autocomplete (Sugestões enquanto digita) */
         .autocomplete-list { 
             position: absolute; 
             width: calc(100% - 40px); 
-            background: #1e293b; 
-            border: 1px solid #334155; 
+            background: var(--list-bg); 
+            border: 1px solid var(--border); 
             border-radius: 0 0 12px 12px; 
             max-height: 200px; 
             overflow-y: auto; 
@@ -108,22 +126,22 @@
             display: none; 
             box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
         }
-        .suggestion-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; }
+        .suggestion-item { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; }
         .suggestion-item img { width: 30px; height: 30px; border-radius: 4px; margin-right: 10px; object-fit: contain; background: #fff; }
 
         #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 15px; display: none; border: 2px solid var(--primary); }
         
         /* Estilos da Exibição de Resultados */
-        #areaResultado { display: none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
-        .product-header { display: flex; align-items: center; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px; }
+        #areaResultado { display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px; }
+        .product-header { display: flex; align-items: center; margin-bottom: 15px; background: var(--btn-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
         .product-header img { width: 50px; height: 50px; object-fit: contain; background: white; border-radius: 8px; margin-right: 12px; }
         
         .scroll-precos { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
         .card-preco { 
-            background: rgba(255,255,255,0.05); 
-            padding: 10px; 
+            background: var(--btn-bg); 
+            padding: 12px; 
             border-radius: 10px; 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border: 1px solid var(--border); 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
@@ -138,18 +156,18 @@
 
         /* Estilo da Revisão de Cupom (IA) */
         #areaOcr { display: none; margin-top: 20px; background: rgba(59, 130, 246, 0.05); border: 1px solid var(--blue); border-radius: 18px; padding: 15px; }
-        .item-ocr { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.85em; }
+        .item-ocr { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); font-size: 0.9em; }
 
         /* Botões de Ação Inferiores */
         .action-group { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
         .btn-action { 
-            background: rgba(255, 255, 255, 0.02); 
-            border: 1px solid #334155; 
-            color: #cbd5e1; 
+            background: var(--btn-bg); 
+            border: 1px solid var(--border); 
+            color: var(--text); 
             border-radius: 12px; 
-            padding: 10px 15px; 
+            padding: 12px 15px; 
             text-align: left; 
-            font-size: 0.85em; 
+            font-size: 0.95em; 
             display: flex; 
             align-items: center; 
             cursor: pointer; 
@@ -174,20 +192,20 @@
             align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;
         }
         #uiModalBox {
-            background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+            background: var(--card); border: 1px solid var(--border); border-radius: 16px;
             padding: 24px; width: 85%; max-width: 320px; text-align: center;
             transform: translateY(20px); transition: transform 0.3s; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
-        #uiModalText { margin: 0 0 20px 0; color: #fff; font-size: 0.95em; line-height: 1.4; }
+        #uiModalText { margin: 0 0 20px 0; color: var(--text); font-size: 1.05em; line-height: 1.4; }
         #uiModalInput { 
-            display: none; width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 8px;
-            background: rgba(0,0,0,0.3); border: 1px solid var(--primary); color: white;
+            display: none; width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px;
+            background: var(--input-bg); border: 1px solid var(--primary); color: var(--text);
             outline: none; font-size: 1em;
         }
         .ui-btn-group { display: flex; gap: 10px; justify-content: center; }
-        .ui-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .ui-btn { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 1.05em;}
         .ui-btn-ok { background: var(--primary); color: #fff; }
-        .ui-btn-cancel { background: #334155; color: #fff; display: none; }
+        .ui-btn-cancel { background: var(--btn-bg); border: 1px solid var(--border); color: var(--text); display: none; }
         .ui-btn:active { transform: scale(0.95); }
         
         #uiToast {
@@ -201,7 +219,8 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.3.3</div>
+        <div class="version-tag">VERSÃO 10.3.4</div>
+        <div class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-sun" id="themeIcon"></i></div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
@@ -284,14 +303,14 @@
         <div id="containerLista" style="margin-top:20px; padding-bottom: 120px;"></div>
         
         <!-- Rodapé Fixado da Lista -->
-        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg); border-top: 1px solid rgba(255,255,255,0.1); padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; z-index: 1001;">
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg); border-top: 1px solid var(--border); padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; z-index: 1001;">
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem;">
                 <b>Total Estimado:</b>
                 <b style="color:var(--primary)" id="totalLista">R$ 0.00</b>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn" style="background:var(--error); flex: 1;" onclick="limparLista()"><i class="fas fa-trash"></i> Limpar</button>
-                <button class="btn" style="background:#334155; flex: 1;" onclick="fecharListaCompras()">Voltar</button>
+                <button class="btn" style="background:var(--error); flex: 1; color: #fff;" onclick="limparLista()"><i class="fas fa-trash"></i> Limpar</button>
+                <button class="btn" style="background:var(--btn-bg); border: 1px solid var(--border); color: var(--text); flex: 1;" onclick="fecharListaCompras()">Voltar</button>
             </div>
         </div>
     </div> <!-- Fechamento da Lista de Compras -->
@@ -375,7 +394,20 @@
         let arquivoFotoParaUpload = null, ehProdutoNovo = false, itensOcrGlobal = [];
         let listaComprasLocal = JSON.parse(localStorage.getItem('minhas_compras_v10')) || [];
 
-        window.onload = carregarMercados;
+        window.onload = () => { carregarMercados(); initTheme(); };
+
+        // --- SISTEMA DE TEMA CLARO/ESCURO ---
+        function initTheme() {
+            if (localStorage.getItem('tema_v10') === 'light') { document.body.classList.add('light-theme'); document.getElementById('themeIcon').className = 'fas fa-moon'; }
+            else { document.getElementById('themeIcon').className = 'fas fa-sun'; }
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            const isLight = document.body.classList.contains('light-theme');
+            document.getElementById('themeIcon').className = isLight ? 'fas fa-moon' : 'fas fa-sun';
+            localStorage.setItem('tema_v10', isLight ? 'light' : 'dark');
+        }
 
         // 1. Carrega supermercados do banco
         async function carregarMercados() {
@@ -722,17 +754,17 @@
                 somaTotal += subtotal; // Soma sempre, independente do Check
                 
                 cont.innerHTML += `
-                <div class="card-preco" style="margin-bottom:10px; flex-direction: column; align-items: stretch; border-left: 4px solid ${it.check ? 'var(--primary)' : '#334155'}; opacity: ${it.check ? 0.6 : 1};">
+                <div class="card-preco" style="margin-bottom:10px; flex-direction: column; align-items: stretch; border-left: 4px solid ${it.check ? 'var(--primary)' : 'var(--border)'}; opacity: ${it.check ? 0.6 : 1};">
                     <div style="display: flex; justify-content: space-between; align-items: center;" onclick="toggleCheck(${i})">
                         <span style="${it.check ? 'text-decoration: line-through' : ''}; flex: 1;">${it.nome}</span>
                         <b style="color:var(--primary); margin-left: 10px;">R$ ${subtotal.toFixed(2)}</b>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
                         <small style="color:#94a3b8">Unit: R$ ${it.preco.toFixed(2)}</small>
                         <div style="display:flex; gap: 8px; align-items: center;">
-                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, -1)">-</button>
+                            <button style="background:var(--btn-bg); border:1px solid var(--border); color:var(--text); padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, -1)">-</button>
                             <b style="width: 20px; text-align: center;">${it.qtd}</b>
-                            <button style="background:#334155; border:none; color:white; padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, 1)">+</button>
+                            <button style="background:var(--btn-bg); border:1px solid var(--border); color:var(--text); padding:5px 12px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="alterarQtdLista(${i}, 1)">+</button>
                             <button style="background:var(--error); border:none; color:white; padding:5px 12px; border-radius:5px; margin-left:10px; cursor:pointer;" onclick="removerDaLista(${i})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
@@ -759,3 +791,5 @@
             }, 300);
         }
     </script>
+</body>
+</html>
