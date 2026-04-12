@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.3.4 - IA & Lista</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Smart Scanner v10.3.5 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -51,6 +51,7 @@
             margin: 0; 
             padding: 20px; 
             box-sizing: border-box; 
+            touch-action: manipulation; /* Bloqueia duplo-toque para dar zoom */
         }
         
         /* Container Principal com efeito Glassmorphism (vidro) */
@@ -219,7 +220,7 @@
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.3.4</div>
+        <div class="version-tag">VERSÃO 10.3.5</div>
         <div class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-sun" id="themeIcon"></i></div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
