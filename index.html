@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scanner v10.3.2 - IA & Lista</title>
+    <title>Smart Scanner v10.3.3 - IA & Lista</title>
     
     <!-- Bibliotecas: Supabase (Banco de Dados) e Html5Qrcode (Scanner de Câmera) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -167,12 +167,41 @@
             box-sizing: border-box;
             overflow-y: auto;
         }
+        /* Sistema de Alertas Embutido (Custom Modal) */
+        #uiModalOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); z-index: 9999;
+            align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;
+        }
+        #uiModalBox {
+            background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+            padding: 24px; width: 85%; max-width: 320px; text-align: center;
+            transform: translateY(20px); transition: transform 0.3s; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        #uiModalText { margin: 0 0 20px 0; color: #fff; font-size: 0.95em; line-height: 1.4; }
+        #uiModalInput { 
+            display: none; width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 8px;
+            background: rgba(0,0,0,0.3); border: 1px solid var(--primary); color: white;
+            outline: none; font-size: 1em;
+        }
+        .ui-btn-group { display: flex; gap: 10px; justify-content: center; }
+        .ui-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .ui-btn-ok { background: var(--primary); color: #fff; }
+        .ui-btn-cancel { background: #334155; color: #fff; display: none; }
+        .ui-btn:active { transform: scale(0.95); }
+        
+        #uiToast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: var(--primary); color: #fff; padding: 12px 24px; border-radius: 30px;
+            font-weight: bold; font-size: 0.9em; z-index: 9998; opacity: 0; transition: all 0.4s;
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
     </style>
 </head>
 <body>
 
     <div class="smart-card">
-        <div class="version-tag">VERSÃO 10.3.2</div>
+        <div class="version-tag">VERSÃO 10.3.3</div>
         <h1>Smart Scanner</h1>
         <p class="subtitle">Produtos e Preços Inteligentes</p>
         
@@ -265,9 +294,74 @@
                 <button class="btn" style="background:#334155; flex: 1;" onclick="fecharListaCompras()">Voltar</button>
             </div>
         </div>
+    <!-- Sistema de Modal Customizado -->
+    <div id="uiModalOverlay">
+        <div id="uiModalBox">
+            <p id="uiModalText"></p>
+            <input type="text" id="uiModalInput" autocomplete="off">
+            <div class="ui-btn-group">
+                <button class="ui-btn ui-btn-cancel" id="uiBtnCancel">Não</button>
+                <button class="ui-btn ui-btn-ok" id="uiBtnOk">OK</button>
+            </div>
+        </div>
     </div>
+    <div id="uiToast">MENSAGEM AQUI</div>
 
     <script>
+        // --- SISTEMA DE UI AMIGÁVEL ---
+        // Comentário para Estudo: Estas funções substituem os feios 'alert', 'confirm' e 'prompt' nativos do navegador.
+        // Elas funcionam retornando 'Promises', obrigando o sistema a esperar a escolha do botão pelo usuário.
+        function uiToast(msg) {
+            const t = document.getElementById('uiToast');
+            t.innerText = msg;
+            t.style.transform = 'translateX(-50%) translateY(0)';
+            t.style.opacity = '1';
+            setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(100px)'; }, 3000);
+        }
+
+        function showUiModal(msg, tipo = 'alert', inputPlaceholder = '') {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('uiModalOverlay');
+                const box = document.getElementById('uiModalBox');
+                const txt = document.getElementById('uiModalText');
+                const inp = document.getElementById('uiModalInput');
+                const btnOk = document.getElementById('uiBtnOk');
+                const btnCancel = document.getElementById('uiBtnCancel');
+
+                txt.innerHTML = msg; inp.style.display = 'none'; inp.value = ''; btnCancel.style.display = 'none';
+                btnOk.innerText = 'OK';
+                
+                if (tipo === 'confirm') {
+                    btnCancel.style.display = 'block';
+                    btnOk.innerText = 'Sim'; btnCancel.innerText = 'Não';
+                } else if (tipo === 'prompt') {
+                    btnCancel.style.display = 'block';
+                    inp.style.display = 'block'; inp.placeholder = inputPlaceholder;
+                    btnOk.innerText = 'Salvar'; btnCancel.innerText = 'Cancelar';
+                }
+
+                overlay.style.display = 'flex';
+                setTimeout(() => { overlay.style.opacity = '1'; box.style.transform = 'translateY(0)'; }, 10);
+
+                const closeAndResolve = (val) => {
+                    overlay.style.opacity = '0'; box.style.transform = 'translateY(20px)';
+                    setTimeout(() => overlay.style.display = 'none', 300);
+                    btnOk.onclick = null; btnCancel.onclick = null;
+                    resolve(val);
+                };
+
+                btnOk.onclick = () => { 
+                    if(tipo === 'prompt' && !inp.value.trim()) return; 
+                    closeAndResolve(tipo === 'prompt' ? inp.value.trim() : true); 
+                };
+                btnCancel.onclick = () => closeAndResolve(tipo === 'prompt' ? null : false);
+                if (tipo === 'prompt') setTimeout(() => inp.focus(), 300);
+            });
+        }
+        const uiAlert = (msg) => showUiModal(msg, 'alert');
+        const uiConfirm = (msg) => showUiModal(msg, 'confirm');
+        const uiPrompt = (msg, ph) => showUiModal(msg, 'prompt', ph);
+
         // --- CONFIGURAÇÃO ---
         const URL_BANCO = 'https://vnpoanckjsjggqqtlpxk.supabase.co';
         const CHAVE_ANON = 'sb_publishable_wzxmqxBXAq2s9krb3Q-Eiw_4gHowgs7';
@@ -366,7 +460,7 @@
 
         async function salvarLoteOcr() {
             const mercadoId = document.getElementById('selectMercadoOcr').value;
-            if (!mercadoId) return alert("Escolha o mercado!");
+            if (!mercadoId) return uiAlert("Escolha o mercado!");
             
             const btnSalvar = document.getElementById('btnSalvarOcr');
             if (btnSalvar) {
@@ -386,10 +480,10 @@
                         data_coleta: new Date().toISOString() 
                     }]);
                 }
-                alert("✅ Lote de preços salvo!");
+                uiToast("✅ Lote de preços salvo!");
                 fecharOcr();
             } catch (err) {
-                alert("Erro ao salvar: " + err.message);
+                uiAlert("Erro ao salvar: " + err.message);
             } finally {
                 if (btnSalvar) {
                     btnSalvar.disabled = false;
@@ -439,7 +533,7 @@
             const { data } = await supabaseClient.from('produtos').select(`id, nome, foto_url, precos(valor, data_coleta, supermercado_id, supermercados(nome))`).or(`id.eq.${t},nome.ilike.%${t}%`).maybeSingle();
             if (data) exibirResultados(data, false);
             else if (!isNaN(t) && t.length >= 8) buscarNaWeb(t);
-            else alert("Produto não encontrado.");
+            else uiAlert("Produto não encontrado.");
         }
 
         async function buscarNaWeb(ean) {
@@ -448,7 +542,7 @@
                 const json = await res.json();
                 if (json.status === 1) exibirResultados({ id: ean, nome: json.product.product_name || "Desconhecido", foto_url: json.product.image_url || "" }, true);
                 else ativarModoNovo(ean);
-            } catch (e) { alert("Erro ao consultar Web."); }
+            } catch (e) { uiAlert("Erro ao consultar Web."); }
         }
 
         function exibirResultados(p, ehWeb) {
@@ -478,7 +572,7 @@
         async function salvarTudo() {
             const p = document.getElementById('inputPreco').value;
             const m = document.getElementById('selectMercado').value;
-            if (!p || !m) return alert("Preencha preço e loja!");
+            if (!p || !m) return uiAlert("Preencha preço e loja!");
             const btn = document.getElementById('btnFinalizar'); btn.disabled = true; btn.innerText = "⏳ Gravando...";
             try {
                 let nFinal = ehProdutoNovo ? document.getElementById('novoNome').value : document.getElementById('resNome').innerText;
@@ -490,9 +584,9 @@
                 }
                 await supabaseClient.from('produtos').upsert({ id: eanAtual, nome: nFinal, foto_url: fFinal });
                 await supabaseClient.from('precos').insert([{ produto_id: eanAtual, valor: parseFloat(p), supermercado_id: parseInt(m), data_coleta: new Date().toISOString() }]);
-                alert("✅ Sucesso!"); buscarHibrida();
+                uiToast("✅ Sucesso!"); buscarHibrida();
             } catch (err) { 
-                alert("Erro: " + err.message); 
+                uiAlert("Erro: " + err.message); 
             } finally {
                 btn.disabled = false; btn.innerText = "💾 SALVAR NO BANCO";
             }
@@ -514,7 +608,7 @@
                 document.getElementById('resFoto').src = e.target.result;
                 comprimirParaUpload(e.target.result, f.name);
             }; r.readAsDataURL(f);
-            alert("📷 Câmera capturada!\n\nAperte no botão verde 'SALVAR NO BANCO' para atualizar ela definitivamente no sistema!");
+            uiAlert("📷 Câmera capturada!<br><br>Aperte no botão verde 'SALVAR NO BANCO' para atualizar ela definitivamente no sistema!");
         }
 
         function comprimirParaUpload(base64, nome) {
@@ -557,7 +651,7 @@
             document.getElementById('novoNome').value = '';
         }
         function ativarModoNovo(ean) { resetarInterface(); ehProdutoNovo = true; eanAtual = ean; document.getElementById('areaNovoCadastro').style.display='block'; document.getElementById('areaFormularioPreco').style.display='block'; }
-        async function cadastrarLoja() { const n = prompt("Supermercado:"); if (n) { await supabaseClient.from('supermercados').insert([{ nome: n }]); carregarMercados(); } }
+        async function cadastrarLoja() { const n = await uiPrompt("Supermercado:", "Ex: Assaí"); if (n) { await supabaseClient.from('supermercados').insert([{ nome: n }]); carregarMercados(); } }
 
         // 5. Lista de Compras Completa
         function abrirListaCompras() {
@@ -575,7 +669,7 @@
         function adicionarPrecoALista() {
             const nome = document.getElementById('resNome').innerText;
             const preco = parseFloat(document.getElementById('inputPreco').value);
-            if(!preco) return alert("Digite o preço primeiro!");
+            if(!preco) return uiAlert("Digite o preço primeiro!");
             
             // Verifica se já existe para só somar a qtd
             const index = listaComprasLocal.findIndex(it => it.nome === nome && it.preco === preco);
@@ -586,7 +680,7 @@
             }
             
             salvarCarrinho();
-            alert("🛒 Adicionado à lista!");
+            uiToast("🛒 Adicionado à lista!");
             document.getElementById('barcodeInput').value = '';
             resetarInterface();
         }
@@ -597,15 +691,15 @@
             salvarCarrinho();
         }
 
-        function removerDaLista(index) {
-            if(confirm("Remover este item do carrinho?")) {
+        async function removerDaLista(index) {
+            if(await uiConfirm("Remover este item do carrinho?")) {
                 listaComprasLocal.splice(index, 1);
                 salvarCarrinho();
             }
         }
 
-        function limparLista() {
-            if(confirm("Tem certeza que deseja esvaziar TODA a lista de compras?")) {
+        async function limparLista() {
+            if(await uiConfirm("Tem certeza que deseja esvaziar TODA a lista de compras?")) {
                 listaComprasLocal = [];
                 salvarCarrinho();
             }
