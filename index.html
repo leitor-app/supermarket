@@ -856,25 +856,32 @@
                 let ranking = [];
                 data.forEach(p => {
                     if (!p.precos || p.precos.length === 0) return;
-                    let menorPrecoInfo = null;
                     
+                    // Isolar menor preço por supermercado para não haver duplicidade do mesmo local
+                    let mercadosUnicos = {};
                     p.precos.forEach(pr => {
-                        if (!menorPrecoInfo || pr.valor < menorPrecoInfo.valor) {
-                            menorPrecoInfo = pr;
+                        let nomeMercado = pr.supermercados ? pr.supermercados.nome : 'Desconhecido';
+                        if (!mercadosUnicos[nomeMercado] || pr.valor < mercadosUnicos[nomeMercado].valor) {
+                            mercadosUnicos[nomeMercado] = pr;
                         }
                     });
                     
-                    if (menorPrecoInfo) {
+                    // Obter os top 3 mercados mais baratos para ESTE produto
+                    let precosOrdenados = Object.values(mercadosUnicos)
+                                            .sort((a,b) => a.valor - b.valor)
+                                            .slice(0, 3);
+                    
+                    if (precosOrdenados.length > 0) {
                         ranking.push({
                             nome: p.nome,
-                            valor: menorPrecoInfo.valor,
-                            mercado: menorPrecoInfo.supermercados ? menorPrecoInfo.supermercados.nome : 'Desconhecido',
-                            data: menorPrecoInfo.data_coleta
+                            precos: precosOrdenados,
+                            menorAbsoluto: precosOrdenados[0].valor
                         });
                     }
                 });
                 
-                ranking.sort((a, b) => a.valor - b.valor);
+                // Ordenar toda a lista de forma que blocos com itens mais baratos absolutos fiquem no topo
+                ranking.sort((a, b) => a.menorAbsoluto - b.menorAbsoluto);
                 status.style.display = 'none';
                 
                 if (ranking.length === 0) {
@@ -883,21 +890,28 @@
                 }
                 
                 let html = "";
-                ranking.forEach((r, idx) => {
-                    let medalha = "";
-                    if (idx === 0) medalha = "🥇";
-                    else if (idx === 1) medalha = "🥈";
-                    else if (idx === 2) medalha = "🥉";
-                    else medalha = `<b style="font-size:0.7em;">${idx+1}º</b>`;
+                ranking.forEach((r) => {
+                    html += `
+                    <div class="card-preco" style="margin-bottom:15px; display: flex; flex-direction: column; border-left: 4px solid var(--primary); padding: 12px;">
+                        <div style="font-weight: bold; font-size: 1.05em; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">${r.nome}</div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">`;
+                        
+                    r.precos.forEach((pr, idx) => {
+                        let arrM = ["🥇", "🥈", "🥉"];
+                        let medalha = arrM[idx] || `${idx+1}º`;
+                        let opacidade = idx === 0 ? "1" : "0.7";
+                        let tamanho = idx === 0 ? "1.1em" : "1em";
+                        let nomeMercado = pr.supermercados ? pr.supermercados.nome : 'Desconhecido';
+                        
+                        html += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; opacity: ${opacidade};">
+                                <div><span style="display:inline-block; width:22px; font-size:1.1em; text-align:center;">${medalha}</span> <span style="color:var(--text-muted); font-size: 0.9em; padding-left: 5px;">${nomeMercado}</span></div>
+                                <div style="font-weight: 900; color: ${idx === 0 ? 'var(--primary)' : 'var(--text)'}; font-size: ${tamanho};">R$ ${pr.valor.toFixed(2)}</div>
+                            </div>`;
+                    });
                     
                     html += `
-                    <div class="card-preco" style="margin-bottom:10px; display: flex; align-items: center; gap: 12px; border-left: 4px solid var(--warning);">
-                        <div style="font-size: 1.8rem; width: 35px; text-align: center; color: var(--primary);">${medalha}</div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: bold; font-size: 0.95em; margin-bottom: 4px;">${r.nome}</div>
-                            <div style="font-size: 0.75em; color: var(--text-muted);"><i class="fas fa-store"></i> Em: ${r.mercado}</div>
                         </div>
-                        <div style="font-weight: 900; color: var(--primary); font-size: 1.25em;">R$ ${r.valor.toFixed(2)}</div>
                     </div>`;
                 });
                 cont.innerHTML = html;
