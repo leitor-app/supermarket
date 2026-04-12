@@ -329,6 +329,15 @@
                 const textoIA = json.candidates[0].content.parts[0].text.replace(/```json/g, "").replace(/```/g, "").trim();
                 const dados = JSON.parse(textoIA);
 
+                if (dados.itens) {
+                    dados.itens.forEach(it => {
+                        let originalCode = it.ean || it.codigo_barras;
+                        if (originalCode) {
+                            it.ean = String(originalCode).replace(/^0+/, '');
+                        }
+                    });
+                }
+
                 itensOcrGlobal = dados.itens || [];
                 status.innerText = `✅ Detectamos ${itensOcrGlobal.length} produtos.`;
                 renderizarRevisaoOcr();
